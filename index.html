@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stasher — Opportunity Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --surface: #111827;
+      --surface-2: #1a2236;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --cyan: #06b6d4;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* Top bar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      height: 56px;
+      z-index: 100;
+    }
+    .topbar h1 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .topbar h1 span { color: var(--accent-light); }
+    .topbar-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .topbar-controls select, .topbar-controls input {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+    .topbar-controls select:focus, .topbar-controls input:focus {
+      border-color: var(--accent);
+    }
+
+    /* Layout */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      height: calc(100vh - 96px);
+    }
+
+    /* Left: main content */
+    .main-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* KPI strip */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      padding: 16px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .kpi-card {
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+    }
+    .kpi-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .kpi-card .value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .kpi-card .sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Scatter + Table area */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Scatter chart */
+    .scatter-section {
+      padding: 16px 24px;
+      flex-shrink: 0;
+    }
+    .scatter-section h2 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .scatter-container {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    canvas#scatterChart {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Opportunity table */
+    .table-section {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 0 24px 16px;
+    }
+    .table-section h2 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .table-scroll {
+      flex: 1;
+      overflow-y: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .table-scroll::-webkit-scrollbar { width: 6px; }
+    .table-scroll::-webkit-scrollbar-track { background: var(--surface); }
+    .table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    thead th {
+      background: var(--surface-2);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: var(--text); }
+    thead th.sorted-asc::after { content: ' ↑'; color: var(--accent-light); }
+    thead th.sorted-desc::after { content: ' ↓'; color: var(--accent-light); }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(99, 102, 241, 0.08); }
+    tbody tr.selected { background: rgba(99, 102, 241, 0.15); }
+    tbody td {
+      padding: 10px 14px;
+      white-space: nowrap;
+    }
+
+    /* Performing well row highlight */
+    tbody tr.row-performing {
+      border-left: 3px solid var(--success);
+      background: rgba(16,185,129,0.04);
+    }
+    tbody tr.row-performing:hover {
+      background: rgba(16,185,129,0.10);
+    }
+
+    /* Opportunity bar */
+    .opp-bar-bg {
+      width: 80px;
+      height: 6px;
+      background: var(--surface);
+      border-radius: 3px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    .opp-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+
+    /* Conversion rate badge */
+    .conv-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .conv-low { background: rgba(239,68,68,0.15); color: #f87171; }
+    .conv-med { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .conv-high { background: rgba(16,185,129,0.15); color: #34d399; }
+
+    /* CVR tier badge */
+    .tier-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tier-critical { background: rgba(239,68,68,0.15); color: #f87171; }
+    .tier-subpar { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .tier-average { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+    .tier-good { background: rgba(16,185,129,0.15); color: #34d399; }
+    .tier-star { background: rgba(6,182,212,0.15); color: #22d3ee; }
+
+    /* Stashpoints badge */
+    .sp-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .sp-none { background: rgba(239,68,68,0.15); color: #f87171; }
+    .sp-low { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .sp-ok { background: rgba(16,185,129,0.15); color: #34d399; }
+
+    /* Right: minimap panel */
+    .minimap-panel {
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .minimap-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .minimap-header h2 {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .minimap-header .loc-name {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    #minimap {
+      height: 250px;
+      flex-shrink: 0;
+    }
+    .detail-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .detail-scroll-area::-webkit-scrollbar { width: 6px; }
+    .detail-scroll-area::-webkit-scrollbar-track { background: var(--surface); }
+    .detail-scroll-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .detail-stats {
+      padding: 16px;
+    }
+    .detail-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-stat-row .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .detail-stat-row .stat-value {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* Nearby locations list */
+    .nearby-section {
+      padding: 0 16px 16px;
+    }
+    .nearby-section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .nearby-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nearby-item:hover { background: rgba(99,102,241,0.12); }
+    .nearby-item .ni-name { font-weight: 500; }
+    .nearby-item .ni-stats { color: var(--text-muted); }
+
+    /* No selection state */
+    .empty-minimap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+      padding: 24px;
+    }
+
+    /* Scatter tooltip */
+    .scatter-tooltip {
+      position: absolute;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 50;
+      max-width: 250px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      display: none;
+    }
+    .scatter-tooltip .tt-name { font-weight: 700; margin-bottom: 4px; }
+    .scatter-tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-muted); }
+
+    /* Quadrant labels */
+    .quadrant-label {
+      position: absolute;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(148,163,184,0.3);
+      pointer-events: none;
+    }
+
+    /* Type tag */
+    .type-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      background: rgba(99,102,241,0.12);
+      color: var(--accent-light);
+    }
+
+    /* Leaflet customization */
+    .leaflet-container { background: #0d1117; }
+    .leaflet-tile { filter: brightness(0.7) saturate(0.8) contrast(1.1); }
+    .custom-marker {
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.6);
+      box-shadow: 0 0 12px rgba(99,102,241,0.5);
+    }
+    .custom-marker.selected-marker {
+      border-color: var(--accent-light);
+      box-shadow: 0 0 20px rgba(99,102,241,0.8);
+    }
+
+    /* SEO Settings button */
+    .seo-settings-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .seo-settings-btn:hover { border-color: var(--accent); color: var(--text); }
+    .seo-settings-btn.connected { border-color: var(--success); color: var(--success); }
+
+    /* Modal overlay */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 400px;
+      max-width: 90vw;
+    }
+    .modal-box h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .modal-box label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
+    .modal-box input[type="text"], .modal-box input[type="password"] {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+    .modal-box input:focus { border-color: var(--accent); }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    .modal-actions button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    .modal-actions button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* SERP rank badge */
+    .serp-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .serp-top10 { background: rgba(16,185,129,0.15); color: #34d399; }
+    .serp-top30 { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .serp-low { background: rgba(239,68,68,0.15); color: #f87171; }
+    .serp-nr { background: rgba(148,163,184,0.1); color: var(--text-muted); }
+
+    /* SEO detail section */
+    .seo-section {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .seo-section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent-light);
+      margin-bottom: 10px;
+    }
+    .seo-loading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 12px 0;
+    }
+    .seo-spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .seo-kw-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .seo-kw-table th {
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .seo-kw-table td {
+      padding: 6px;
+      border-bottom: 1px solid rgba(30,41,59,0.5);
+    }
+    .seo-competitor {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(30,41,59,0.5);
+    }
+    .seo-competitor .comp-domain { color: var(--text); font-weight: 500; }
+    .seo-competitor .comp-pos { color: var(--text-muted); }
+
+    /* Tab bar */
+    .tab-bar {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      height: 40px;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--accent-light);
+      border-bottom-color: var(--accent-light);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    /* Full map tab */
+    #tab-map {
+      position: relative;
+    }
+    #tab-map.active {
+      display: block;
+    }
+    #fullMap {
+      width: 100%;
+      height: 100%;
+    }
+    .map-legend {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      z-index: 500;
+      font-size: 12px;
+    }
+    .map-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .map-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* SEO fetch button */
+    .seo-fetch-btn {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-left: 12px;
+    }
+    .seo-fetch-btn:hover { background: var(--accent-light); }
+    .seo-fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .tab-content.active {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .layout.map-active {
+      grid-template-columns: 1fr;
+    }
+    .layout.map-active .minimap-panel {
+      display: none;
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: var(--surface-2);
+      color: var(--text);
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .leaflet-popup-tip { background: var(--surface-2); }
+    .leaflet-popup-close-button { color: var(--text-muted) !important; }
+
+    /* Supply/demand section */
+    .supply-section {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .supply-section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cyan);
+      margin-bottom: 10px;
+    }
+    .supply-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: var(--surface-2);
+      border-radius: 6px;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .supply-item .sp-name { font-weight: 500; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .supply-item .sp-meta { color: var(--text-muted); font-size: 11px; }
+    .supply-gap-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: var(--surface-2);
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .supply-gap-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    /* Map controls */
+    .map-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 500;
+      display: flex;
+      gap: 8px;
+    }
+    .map-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .map-toggle.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .minimap-panel { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Stasher <span>Opportunity Dashboard</span></h1>
+  <div class="topbar-controls">
+    <select id="filterCountry"><option value="">All Countries</option></select>
+    <select id="filterCity"><option value="">All Cities</option></select>
+    <select id="filterType"><option value="">All Types</option></select>
+    <label id="excludeAirportsLabel" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none;">
+      <input type="checkbox" id="excludeAirports" style="accent-color:var(--accent);cursor:pointer;" /> Exclude Airports
+    </label>
+    <input type="text" id="searchBox" placeholder="Search locations…" style="width: 200px;" />
+    <button class="seo-settings-btn" id="seoSettingsBtn" title="DataForSEO API Settings">&#9881; SEO API</button>
+    <div id="syncStatus" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);margin-left:8px;white-space:nowrap;">
+      <span id="syncDot" style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;"></span>
+      <span id="syncText">Synced just now</span>
+    </div>
+  </div>
+</div>
+
+<!-- DataForSEO Credentials Modal -->
+<div class="modal-overlay" id="seoModal">
+  <div class="modal-box">
+    <h3>DataForSEO API Settings</h3>
+    <label>Login (email)</label>
+    <input type="text" id="dfsLogin" placeholder="your@email.com" autocomplete="off" />
+    <label>Password</label>
+    <input type="password" id="dfsPassword" placeholder="API password" autocomplete="off" />
+    <div id="dfsStatus" style="margin-top:12px;font-size:12px;color:var(--text-muted);display:none;"></div>
+    <div class="modal-actions">
+      <button id="dfsClear">Clear</button>
+      <button id="dfsCancel">Cancel</button>
+      <button id="dfsSave" class="primary">Save & Test</button>
+    </div>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="opportunity">Opportunity</button>
+  <button class="tab-btn" data-tab="performing">Performing Well</button>
+  <button class="tab-btn" data-tab="underperforming">Underperforming</button>
+  <button class="tab-btn" data-tab="seo">SEO Intelligence</button>
+  <button class="tab-btn" data-tab="map">Map</button>
+</div>
+
+<div class="layout">
+  <div class="main-panel">
+    <!-- TAB: Opportunity -->
+    <div class="tab-content active" id="tab-opportunity">
+      <div class="kpi-strip" id="kpiStrip"></div>
+      <div class="content-area">
+        <div class="scatter-section">
+          <h2>Demand vs Conversion — Opportunity Quadrants</h2>
+          <div class="scatter-container" id="scatterContainer">
+            <canvas id="scatterChart"></canvas>
+            <div class="scatter-tooltip" id="scatterTooltip"></div>
+          </div>
+        </div>
+        <div class="table-section">
+          <h2>Opportunity Ranking</h2>
+          <div class="table-scroll" id="tableScroll">
+            <table>
+              <thead id="tableHead"></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Performing Well -->
+    <div class="tab-content" id="tab-performing">
+      <div class="kpi-strip" id="perfKpiStrip"></div>
+      <div class="content-area">
+        <div class="table-section">
+          <h2>Performing Locations (above 8% CVR)</h2>
+          <div class="table-scroll" id="perfTableScroll">
+            <table>
+              <thead id="perfTableHead"></thead>
+              <tbody id="perfTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SEO Intelligence -->
+    <div class="tab-content" id="tab-seo">
+      <div class="kpi-strip" id="seoKpiStrip"></div>
+      <div class="content-area">
+        <div class="table-section">
+          <h2 style="display:flex;align-items:center;">SEO Data by Location <button class="seo-fetch-btn" id="seoFetchBtn">Fetch SEO for Visible</button><span id="seoFetchProgress" style="font-size:11px;color:var(--text-muted);margin-left:8px;font-weight:400;"></span></h2>
+          <div class="table-scroll" id="seoTableScroll">
+            <table>
+              <thead id="seoTableHead"></thead>
+              <tbody id="seoTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Underperforming -->
+    <div class="tab-content" id="tab-underperforming">
+      <div class="kpi-strip" id="underKpiStrip"></div>
+      <div class="content-area">
+        <div class="table-section">
+          <h2>Underperforming Locations (below 8% CVR) — ranked by demand</h2>
+          <div class="table-scroll" id="underTableScroll">
+            <table>
+              <thead id="underTableHead"></thead>
+              <tbody id="underTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Map -->
+    <div class="tab-content" id="tab-map">
+      <div id="fullMap"></div>
+      <div class="map-controls">
+        <input type="text" id="mapSearchBox" placeholder="Search city or location…" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:12px;width:220px;outline:none;" />
+        <button class="map-toggle active" id="mapTogglePoi">&#9679; Demand (POIs)</button>
+        <button class="map-toggle active" id="mapToggleSp">&#9670; Supply (StashPoints)</button>
+      </div>
+      <div class="map-legend">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:6px;">Demand (POIs)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#34d399"></div> Good (&gt;8% CVR)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#fbbf24"></div> Average (4-8% CVR)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#f87171"></div> Low (&lt;4% CVR)</div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:8px 0 6px;">Supply (StashPoints)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#38bdf8;border:1px solid rgba(255,255,255,0.4);"></div> Active StashPoint</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:rgba(56,189,248,0.3);border:1px dashed rgba(255,255,255,0.3);"></div> Inactive StashPoint</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="minimap-panel" id="minimapPanel">
+    <div class="empty-minimap" id="emptyMinimap">
+      Click a row or scatter dot to inspect a location
+    </div>
+    <div id="minimapContent" style="display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
+      <div class="minimap-header">
+        <h2>Location Detail</h2>
+        <div class="loc-name" id="detailName"></div>
+      </div>
+      <div id="minimap"></div>
+      <div class="detail-scroll-area" id="detailScrollArea">
+        <div class="detail-stats" id="detailStats"></div>
+        <div class="supply-section" id="supplySection">
+          <h3>Supply &amp; Demand</h3>
+          <div id="supplyDetail"></div>
+        </div>
+        <div class="seo-section" id="seoSection">
+          <h3>SEO Intelligence</h3>
+          <div id="seoDetail"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '18lJoLa1wYVbhY9obvM5YGmSSk4BpmYrLcfnh_Ez3Gxo';
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+const SP_SHEET_ID = '1D_qM3myv0JRioRjDrlW3mj5KRcfGBpzJMMsyXrmJzEE';
+const SP_CSV_URL = `https://docs.google.com/spreadsheets/d/${SP_SHEET_ID}/export?format=csv`;
+
+let allData = [];
+let filteredData = [];
+let allStashpoints = [];
+let selectedRow = null;
+let minimap = null;
+let minimapMarkers = [];
+let sortCol = 'opportunity_score';
+let sortDir = 'desc';
+
+// ─── Data loading ───
+async function loadData() {
+  try {
+    const [poiResp, spResp] = await Promise.all([
+      fetch(CSV_URL),
+      fetch(SP_CSV_URL),
+    ]);
+    const poiText = await poiResp.text();
+    const spText = await spResp.text();
+    const poiParsed = Papa.parse(poiText, { header: true, skipEmptyLines: true });
+    const spParsed = Papa.parse(spText, { header: true, skipEmptyLines: true });
+    processStashpoints(spParsed.data);
+    processData(poiParsed.data);
+  } catch(e) {
+    try {
+      const resp = await fetch('data.csv');
+      const text = await resp.text();
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      processData(parsed.data);
+    } catch(e2) { console.error('Failed to load data:', e2); }
+  }
+}
+
+function processStashpoints(raw) {
+  allStashpoints = [];
+  raw.forEach(r => {
+    const lat = parseFloat(r.latitude);
+    const lng = parseFloat(r.longitude);
+    if (isNaN(lat) || isNaN(lng)) return;
+    allStashpoints.push({
+      id: r.id || '',
+      name: (r.business_name || '').trim(),
+      locationName: (r.location_name || '').trim(),
+      address: (r.address || '').trim(),
+      lat, lng,
+      capacity: parseInt(r.capacity) || 0,
+      bookings: parseInt(r.booking_count_group) || 0,
+      quality: parseInt(r.quality) || 0,
+      type: (r.new_type || r.storage_type || '').trim(),
+      approved: r.approved === 'TRUE',
+      active: !!r.activated_at && !r.deactivated_at,
+      reviews: parseInt(r.review_count) || 0,
+      rating: parseInt(r.review_rating_total) || 0,
+      openLate: r.open_late === 'TRUE',
+      open24: r.open_twentyfour_seven === 'TRUE',
+      featured: r.featured === 'TRUE',
+      holidayOpen: (r.holiday_open_type || '').trim(),
+      outOfHoursForbidden: r.out_of_hours_forbidden === 'TRUE',
+    });
+  });
+  console.log(`Loaded ${allStashpoints.length} stashpoints`);
+}
+
+function findNearbyStashpoints(lat, lng, radiusKm) {
+  return allStashpoints.filter(sp => {
+    const dist = haversine(lat, lng, sp.lat, sp.lng);
+    return dist <= radiusKm;
+  }).map(sp => ({
+    ...sp,
+    dist: haversine(lat, lng, sp.lat, sp.lng),
+  })).sort((a, b) => a.dist - b.dist);
+}
+
+function processData(raw) {
+  // Deduplicate by coordinates (keep the one with a name/type)
+  const seen = new Map();
+  raw.forEach(r => {
+    const lat = parseFloat(r.latitude);
+    const lng = parseFloat(r.longitude);
+    if (isNaN(lat) || isNaN(lng)) return;
+    const searches = parseInt(r.searches_within_500m) || 0;
+    if (searches === 0) return;
+
+    const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    const existing = seen.get(key);
+    if (!existing || (!existing.name && r.name) || (!existing.type && r.type)) {
+      seen.set(key, {
+        name: (r.name || '').trim(),
+        type: (r.type || '').trim(),
+        country: (r.country || '').trim(),
+        city: (r.city || '').trim(),
+        details: (r.details || '').trim(),
+        lat, lng,
+        searches,
+        conversions: parseInt(r.conversions_within_500m) || 0,
+        conversion_rate: parseFloat(r.conversion_rate) || 0,
+        stashpoints: parseInt(r.stashpoints_within_500m) || 0,
+      });
+    }
+  });
+
+  allData = Array.from(seen.values());
+
+  // CVR tier classification
+  function getCvrTier(rate) {
+    if (rate < 0.04) return { label: 'Critical', cls: 'tier-critical', icon: '!!', weight: 1.0 };
+    if (rate < 0.07) return { label: 'Sub-par', cls: 'tier-subpar', icon: '!', weight: 0.75 };
+    if (rate < 0.10) return { label: 'Average', cls: 'tier-average', icon: '~', weight: 0.45 };
+    if (rate < 0.15) return { label: 'Good', cls: 'tier-good', icon: '', weight: 0.20 };
+    return { label: 'Star', cls: 'tier-star', icon: '', weight: 0.0 };
+  }
+
+  // Compute opportunity score factoring in CVR tier
+  const maxSearches = Math.max(...allData.map(d => d.searches));
+  allData.forEach(d => {
+    d.cvr_tier = getCvrTier(d.conversion_rate);
+    const demandNorm = d.searches / maxSearches;
+    const tierPenalty = d.cvr_tier.weight; // 1.0 for critical, 0.0 for star
+    const supplyGap = 1 - Math.min(d.stashpoints / 15, 1);
+    // Weighted: demand 35%, CVR tier 40%, supply gap 25%
+    d.opportunity_score = Math.round((demandNorm * 0.35 + tierPenalty * 0.40 + supplyGap * 0.25) * 100);
+    d.missed_conversions = Math.round(d.searches * 0.15 - d.conversions);
+    if (d.missed_conversions < 0) d.missed_conversions = 0;
+  });
+
+  populateFilters();
+  applyFilters();
+}
+
+function populateFilters() {
+  const countries = [...new Set(allData.map(d => d.country).filter(Boolean))].sort();
+  const cities = [...new Set(allData.map(d => d.city).filter(Boolean))].sort();
+  const types = [...new Set(allData.map(d => d.type).filter(Boolean))].sort();
+
+  const countryEl = document.getElementById('filterCountry');
+  countries.forEach(c => { const o = document.createElement('option'); o.value = c; o.text = c; countryEl.add(o); });
+
+  const cityEl = document.getElementById('filterCity');
+  cities.forEach(c => { const o = document.createElement('option'); o.value = c; o.text = c; cityEl.add(o); });
+
+  const typeEl = document.getElementById('filterType');
+  types.forEach(t => { const o = document.createElement('option'); o.value = t; o.text = t; typeEl.add(o); });
+}
+
+function applyFilters() {
+  const country = document.getElementById('filterCountry').value;
+  const city = document.getElementById('filterCity').value;
+  const type = document.getElementById('filterType').value;
+  const search = document.getElementById('searchBox').value.toLowerCase();
+  const excludeAirports = document.getElementById('excludeAirports').checked;
+
+  filteredData = allData.filter(d => {
+    if (country && d.country !== country) return false;
+    if (city && d.city !== city) return false;
+    if (type && d.type !== type) return false;
+    if (excludeAirports && d.type.toLowerCase() === 'airport') return false;
+    if (search && !d.name.toLowerCase().includes(search) && !d.city.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  sortData();
+  renderKPIs();
+  renderScatter();
+  renderTable();
+
+  // Re-render active tab if not opportunity
+  if (activeTab === 'performing') renderPerformingTab();
+  else if (activeTab === 'underperforming') renderUnderperformingTab();
+  else if (activeTab === 'seo') renderSeoTab();
+  else if (activeTab === 'map') renderMapTab();
+}
+
+function sortData() {
+  filteredData.sort((a, b) => {
+    let va, vb;
+    if (sortCol === 'cvr_tier_label') {
+      va = a.cvr_tier.weight; vb = b.cvr_tier.weight;
+    } else {
+      va = a[sortCol]; vb = b[sortCol];
+    }
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+// ─── KPIs ───
+function renderKPIs() {
+  const total = filteredData.length;
+  const totalSearches = filteredData.reduce((s, d) => s + d.searches, 0);
+  const totalConv = filteredData.reduce((s, d) => s + d.conversions, 0);
+  const avgConv = totalSearches > 0 ? (totalConv / totalSearches * 100).toFixed(1) : 0;
+  const totalMissed = filteredData.reduce((s, d) => s + d.missed_conversions, 0);
+  const zeroSP = filteredData.filter(d => d.stashpoints === 0).length;
+
+  document.getElementById('kpiStrip').innerHTML = `
+    <div class="kpi-card">
+      <div class="label">Locations</div>
+      <div class="value">${total.toLocaleString()}</div>
+      <div class="sub">unique areas tracked</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Total Searches</div>
+      <div class="value">${totalSearches.toLocaleString()}</div>
+      <div class="sub">within 500m radius</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg. Conversion</div>
+      <div class="value" style="color:${parseFloat(avgConv) < 10 ? 'var(--warning)' : 'var(--success)'}">${avgConv}%</div>
+      <div class="sub">benchmark: 15%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Missed Conversions</div>
+      <div class="value" style="color:var(--danger)">${totalMissed.toLocaleString()}</div>
+      <div class="sub">vs 15% benchmark</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Zero Stashpoints</div>
+      <div class="value" style="color:var(--danger)">${zeroSP}</div>
+      <div class="sub">${total > 0 ? ((zeroSP/total*100).toFixed(0)) : 0}% of locations</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Performing Well</div>
+      <div class="value" style="color:var(--success)">${filteredData.filter(d => d.conversion_rate > 0.08).length}</div>
+      <div class="sub">${total > 0 ? ((filteredData.filter(d => d.conversion_rate > 0.08).length / total * 100).toFixed(0)) : 0}% above 8% CVR</div>
+    </div>
+  `;
+}
+
+// ─── Scatter Chart ───
+function renderScatter() {
+  const canvas = document.getElementById('scatterChart');
+  const container = document.getElementById('scatterContainer');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = rect.height;
+  const pad = { top: 30, right: 30, bottom: 40, left: 60 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (filteredData.length === 0) return;
+
+  const maxS = Math.max(...filteredData.map(d => d.searches));
+  const maxCR = Math.max(...filteredData.map(d => d.conversion_rate), 0.2);
+
+  const medianSearches = filteredData.length > 0
+    ? [...filteredData].sort((a, b) => a.searches - b.searches)[Math.floor(filteredData.length / 2)].searches
+    : 0;
+  const benchmarkCR = 0.10;
+
+  // Quadrant backgrounds
+  const midX = pad.left + (medianSearches / maxS) * plotW;
+  const midY = pad.top + (1 - benchmarkCR / maxCR) * plotH;
+
+  // Top-right: high demand, high conversion (green tint)
+  ctx.fillStyle = 'rgba(16,185,129,0.04)';
+  ctx.fillRect(midX, pad.top, pad.left + plotW - midX, midY - pad.top);
+
+  // Top-left: low demand, high conversion
+  ctx.fillStyle = 'rgba(99,102,241,0.03)';
+  ctx.fillRect(pad.left, pad.top, midX - pad.left, midY - pad.top);
+
+  // Bottom-right: HIGH OPPORTUNITY (red tint)
+  ctx.fillStyle = 'rgba(239,68,68,0.06)';
+  ctx.fillRect(midX, midY, pad.left + plotW - midX, pad.top + plotH - midY);
+
+  // Bottom-left: low demand, low conversion
+  ctx.fillStyle = 'rgba(148,163,184,0.03)';
+  ctx.fillRect(pad.left, midY, midX - pad.left, pad.top + plotH - midY);
+
+  // Quadrant separator lines
+  ctx.strokeStyle = 'rgba(148,163,184,0.15)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(midX, pad.top);
+  ctx.lineTo(midX, pad.top + plotH);
+  ctx.moveTo(pad.left, midY);
+  ctx.lineTo(pad.left + plotW, midY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Quadrant labels
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(148,163,184,0.4)';
+  ctx.textAlign = 'center';
+  ctx.fillText('★ HIGH OPPORTUNITY', (midX + pad.left + plotW) / 2, midY + 16);
+  ctx.fillText('HIGH DEMAND, LOW CONVERSION', (midX + pad.left + plotW) / 2, midY + 28);
+  ctx.fillText('PERFORMING WELL', (midX + pad.left + plotW) / 2, pad.top + 16);
+
+  // Axes
+  ctx.strokeStyle = 'rgba(148,163,184,0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top + plotH);
+  ctx.lineTo(pad.left + plotW, pad.top + plotH);
+  ctx.moveTo(pad.left, pad.top);
+  ctx.lineTo(pad.left, pad.top + plotH);
+  ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = 'var(--text-muted)';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Searches (demand) →', pad.left + plotW / 2, H - 6);
+  ctx.save();
+  ctx.translate(14, pad.top + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Conversion Rate →', 0, 0);
+  ctx.restore();
+
+  // Tick marks
+  ctx.fillStyle = 'rgba(148,163,184,0.5)';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 5; i++) {
+    const v = Math.round(maxS / 5 * i);
+    const x = pad.left + (i / 5) * plotW;
+    ctx.fillText(v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v, x, pad.top + plotH + 16);
+  }
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const v = (maxCR / 5 * i * 100).toFixed(0);
+    const y = pad.top + plotH - (i / 5) * plotH;
+    ctx.fillText(v + '%', pad.left - 8, y + 4);
+  }
+
+  // Store dot positions for hover
+  canvas._dots = [];
+
+  // Draw dots
+  filteredData.forEach((d, i) => {
+    const x = pad.left + (d.searches / maxS) * plotW;
+    const y = pad.top + (1 - d.conversion_rate / maxCR) * plotH;
+    const r = Math.max(3, Math.min(12, Math.sqrt(d.searches / maxS) * 12));
+
+    // Color by opportunity score
+    let color;
+    if (d.opportunity_score >= 70) color = 'rgba(239,68,68,0.7)';
+    else if (d.opportunity_score >= 50) color = 'rgba(245,158,11,0.7)';
+    else color = 'rgba(16,185,129,0.5)';
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    if (selectedRow && selectedRow.lat === d.lat && selectedRow.lng === d.lng) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    canvas._dots.push({ x, y, r, data: d, index: i });
+  });
+}
+
+// Scatter hover/click
+document.getElementById('scatterChart').addEventListener('mousemove', function(e) {
+  const rect = this.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const tooltip = document.getElementById('scatterTooltip');
+
+  let hit = null;
+  for (const dot of (this._dots || [])) {
+    const dx = mx - dot.x, dy = my - dot.y;
+    if (Math.sqrt(dx*dx + dy*dy) < dot.r + 4) { hit = dot; break; }
+  }
+
+  if (hit) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = (hit.x + 16) + 'px';
+    tooltip.style.top = (hit.y - 10) + 'px';
+    const d = hit.data;
+    tooltip.innerHTML = `
+      <div class="tt-name">${d.name || 'Unnamed'}</div>
+      <div class="tt-row"><span>City</span><span>${d.city}, ${d.country}</span></div>
+      <div class="tt-row"><span>CVR Tier</span><span class="tier-badge ${d.cvr_tier.cls}" style="padding:1px 6px;font-size:10px">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></div>
+      <div class="tt-row"><span>Searches</span><span>${d.searches.toLocaleString()}</span></div>
+      <div class="tt-row"><span>Conversion</span><span>${(d.conversion_rate * 100).toFixed(1)}%</span></div>
+      <div class="tt-row"><span>Stashpoints</span><span>${d.stashpoints}</span></div>
+      <div class="tt-row"><span>Opportunity</span><span style="color:var(--accent-light);font-weight:700">${d.opportunity_score}/100</span></div>
+    `;
+    this.style.cursor = 'pointer';
+  } else {
+    tooltip.style.display = 'none';
+    this.style.cursor = 'crosshair';
+  }
+});
+
+document.getElementById('scatterChart').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  for (const dot of (this._dots || [])) {
+    const dx = mx - dot.x, dy = my - dot.y;
+    if (Math.sqrt(dx*dx + dy*dy) < dot.r + 4) {
+      selectLocation(dot.data);
+      break;
+    }
+  }
+});
+
+// ─── Table ───
+function renderTable() {
+  const cols = [
+    { key: 'opportunity_score', label: 'Score', width: '70px' },
+    { key: 'name', label: 'Location' },
+    { key: 'cvr_tier_label', label: 'CVR Tier', width: '110px' },
+    { key: 'type', label: 'Type', width: '110px' },
+    { key: 'city', label: 'City', width: '100px' },
+    { key: 'searches', label: 'Searches', width: '85px' },
+    { key: 'conversion_rate', label: 'Conv. Rate', width: '95px' },
+    { key: 'stashpoints', label: 'Stashpoints', width: '90px' },
+    { key: 'missed_conversions', label: 'Missed Conv.', width: '95px' },
+    { key: 'seo_volume', label: 'SEO Vol.', width: '80px' },
+    { key: 'serp_rank', label: 'SERP Rank', width: '85px' },
+  ];
+
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = '<tr>' + cols.map(c =>
+    `<th data-col="${c.key}" style="${c.width ? 'width:'+c.width : ''}"
+         class="${sortCol === c.key ? 'sorted-' + sortDir : ''}">${c.label}</th>`
+  ).join('') + '</tr>';
+
+  thead.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = col === 'name' || col === 'city' || col === 'country' || col === 'type' || col === 'cvr_tier_label' ? 'asc' : 'desc'; }
+      sortData();
+      renderTable();
+    });
+  });
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = filteredData.slice(0, 200).map((d, i) => {
+    const oppColor = d.opportunity_score >= 70 ? 'var(--danger)' : d.opportunity_score >= 50 ? 'var(--warning)' : 'var(--success)';
+    const convClass = d.conversion_rate < 0.07 ? 'conv-low' : d.conversion_rate < 0.12 ? 'conv-med' : 'conv-high';
+    const spClass = d.stashpoints === 0 ? 'sp-none' : d.stashpoints < 5 ? 'sp-low' : 'sp-ok';
+    const isSelected = selectedRow && selectedRow.lat === d.lat && selectedRow.lng === d.lng;
+
+    const seoKey = `${d.name || ''}|${d.city}|${d.country}`;
+    const seo = seoCache.get(seoKey);
+    const seoVol = seo?.volume != null ? (seo.volume >= 1000 ? (seo.volume / 1000).toFixed(1) + 'k' : seo.volume) : '—';
+    const seoRank = seo ? (seo.rank != null ? getSerpBadgeHtml(seo.rank) : '<span class="serp-badge serp-nr">N/R</span>') : '—';
+
+    const isPerforming = d.conversion_rate > 0.08;
+    return `<tr data-idx="${i}" data-seo-city="${d.city}" data-seo-country="${d.country}" class="${isSelected ? 'selected' : ''} ${isPerforming ? 'row-performing' : ''}">
+      <td>
+        <div class="opp-bar-bg"><div class="opp-bar-fill" style="width:${d.opportunity_score}%;background:${oppColor}"></div></div>
+        <span style="color:${oppColor};font-weight:700">${d.opportunity_score}</span>
+      </td>
+      <td style="font-weight:500">${d.name || '—'}</td>
+      <td><span class="tier-badge ${d.cvr_tier.cls}">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></td>
+      <td>${d.type ? `<span class="type-tag">${d.type}</span>` : '—'}</td>
+      <td>${d.city}</td>
+      <td>${d.searches.toLocaleString()}</td>
+      <td><span class="conv-badge ${convClass}">${(d.conversion_rate * 100).toFixed(1)}%</span></td>
+      <td><span class="sp-badge ${spClass}">${d.stashpoints}</span></td>
+      <td style="color:var(--danger);font-weight:600">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() : '—'}</td>
+      <td class="seo-vol-cell">${seoVol}</td>
+      <td class="seo-rank-cell">${seoRank}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const idx = parseInt(tr.dataset.idx);
+      selectLocation(filteredData[idx]);
+    });
+  });
+}
+
+// ─── Minimap & Detail ───
+function selectLocation(d) {
+  selectedRow = d;
+
+  document.getElementById('emptyMinimap').style.display = 'none';
+  document.getElementById('minimapContent').style.display = 'flex';
+
+  document.getElementById('detailName').textContent = d.name || `${d.city} Area`;
+
+  // Re-render scatter & table for selection highlight
+  renderScatter();
+  renderTable();
+
+  // Map
+  if (!minimap) {
+    minimap = L.map('minimap', {
+      zoomControl: false,
+      attributionControl: false,
+    }).setView([d.lat, d.lng], 15);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+    }).addTo(minimap);
+  } else {
+    minimap.setView([d.lat, d.lng], 15);
+  }
+
+  // Clear old markers
+  minimapMarkers.forEach(m => minimap.removeLayer(m));
+  minimapMarkers = [];
+
+  // Add selected marker
+  const selectedIcon = L.divIcon({
+    className: 'custom-marker selected-marker',
+    iconSize: [16, 16],
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 16px rgba(99,102,241,0.8);"></div>`
+  });
+  minimapMarkers.push(L.marker([d.lat, d.lng], { icon: selectedIcon }).addTo(minimap));
+
+  // 500m radius circle
+  minimapMarkers.push(L.circle([d.lat, d.lng], {
+    radius: 500,
+    color: 'rgba(99,102,241,0.4)',
+    fillColor: 'rgba(99,102,241,0.08)',
+    fillOpacity: 0.3,
+    weight: 1,
+    dashArray: '4 4',
+  }).addTo(minimap));
+
+  // Nearby StashPoints on minimap
+  const nearbySpMini = findNearbyStashpoints(d.lat, d.lng, 0.5);
+  nearbySpMini.forEach(sp => {
+    const spIcon = L.divIcon({
+      className: 'custom-marker',
+      iconSize: [8, 8],
+      html: `<div style="width:8px;height:8px;border-radius:2px;transform:rotate(45deg);background:${sp.active ? '#38bdf8' : 'rgba(56,189,248,0.3)'};border:1px solid rgba(255,255,255,0.3);"></div>`
+    });
+    const m = L.marker([sp.lat, sp.lng], { icon: spIcon }).addTo(minimap);
+    m.bindPopup(`<b style="color:#38bdf8;">${sp.name}</b><br>${sp.capacity} bags capacity`);
+    minimapMarkers.push(m);
+  });
+
+  // Detail stats
+  const convColor = d.conversion_rate < 0.07 ? 'var(--danger)' : d.conversion_rate < 0.12 ? 'var(--warning)' : 'var(--success)';
+  document.getElementById('detailStats').innerHTML = `
+    <div class="detail-stat-row">
+      <span class="stat-label">CVR Tier</span>
+      <span class="stat-value"><span class="tier-badge ${d.cvr_tier.cls}">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Type</span>
+      <span class="stat-value">${d.type || '—'}</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">City / Country</span>
+      <span class="stat-value">${d.city}, ${d.country}</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Searches (500m)</span>
+      <span class="stat-value">${d.searches.toLocaleString()}</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Conversions</span>
+      <span class="stat-value">${d.conversions.toLocaleString()}</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Conversion Rate</span>
+      <span class="stat-value" style="color:${convColor}">${(d.conversion_rate * 100).toFixed(1)}%</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Stashpoints Nearby</span>
+      <span class="stat-value" style="color:${d.stashpoints === 0 ? 'var(--danger)' : d.stashpoints < 5 ? 'var(--warning)' : 'var(--success)'}">${d.stashpoints}</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Opportunity Score</span>
+      <span class="stat-value" style="color:var(--accent-light);font-size:18px">${d.opportunity_score}/100</span>
+    </div>
+    <div class="detail-stat-row">
+      <span class="stat-label">Missed Conversions</span>
+      <span class="stat-value" style="color:var(--danger)">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() : '—'}</span>
+    </div>
+    ${d.details ? `<div class="detail-stat-row"><span class="stat-label">About</span><span class="stat-value" style="white-space:normal;font-size:12px;font-weight:400;color:var(--text-muted);max-width:240px">${d.details}</span></div>` : ''}
+  `;
+
+  // Resize map after render
+  setTimeout(() => minimap.invalidateSize(), 100);
+
+  // Supply/demand data
+  renderSupplyDetail(d);
+
+  // SEO data
+  const seoKey = `${d.name || ''}|${d.city}|${d.country}`;
+  const cachedSeo = seoCache.get(seoKey);
+  if (cachedSeo) {
+    renderSeoDetail(cachedSeo);
+  } else if (getDfsCredentials()) {
+    renderSeoDetail(null); // show loading
+    fetchSeoData(d.name, d.city, d.country, d.lat, d.lng).then(seoData => {
+      // Only update if still showing same location
+      if (selectedRow && selectedRow.lat === d.lat && selectedRow.lng === d.lng) {
+        renderSeoDetail(seoData);
+      }
+    });
+  } else {
+    renderSeoDetail(null);
+  }
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ─── Event listeners ───
+['filterCountry', 'filterCity', 'filterType'].forEach(id => {
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+document.getElementById('searchBox').addEventListener('input', applyFilters);
+document.getElementById('excludeAirports').addEventListener('change', applyFilters);
+
+window.addEventListener('resize', () => { renderScatter(); });
+
+// ─── DataForSEO Integration ───
+const seoCache = new Map(); // key: city name, value: { volume, rank, keywords, competitors, timestamp }
+
+const COUNTRY_LOCATION_MAP = {
+  'United Kingdom': { code: 2826, lang: 'English' },
+  'United States': { code: 2840, lang: 'English' },
+  'France': { code: 2250, lang: 'French' },
+  'Germany': { code: 2276, lang: 'German' },
+  'Spain': { code: 2724, lang: 'Spanish' },
+  'Italy': { code: 2380, lang: 'Italian' },
+  'Netherlands': { code: 2528, lang: 'Dutch' },
+  'Belgium': { code: 2056, lang: 'French' },
+  'Portugal': { code: 2620, lang: 'Portuguese' },
+  'Austria': { code: 2040, lang: 'German' },
+  'Switzerland': { code: 2756, lang: 'German' },
+  'Ireland': { code: 2372, lang: 'English' },
+  'Australia': { code: 2036, lang: 'English' },
+  'Canada': { code: 2124, lang: 'English' },
+  'Japan': { code: 2392, lang: 'Japanese' },
+  'Czech Republic': { code: 2203, lang: 'Czech' },
+  'Poland': { code: 2616, lang: 'Polish' },
+  'Greece': { code: 2300, lang: 'Greek' },
+  'Turkey': { code: 2792, lang: 'Turkish' },
+  'Sweden': { code: 2752, lang: 'Swedish' },
+  'Denmark': { code: 2208, lang: 'Danish' },
+  'Norway': { code: 2578, lang: 'Norwegian' },
+  'Finland': { code: 2246, lang: 'Finnish' },
+  'Croatia': { code: 2191, lang: 'Croatian' },
+  'Hungary': { code: 2348, lang: 'Hungarian' },
+  'Romania': { code: 2642, lang: 'Romanian' },
+  'Thailand': { code: 2764, lang: 'Thai' },
+  'Singapore': { code: 2702, lang: 'English' },
+  'New Zealand': { code: 2554, lang: 'English' },
+  'South Africa': { code: 2710, lang: 'English' },
+  'Brazil': { code: 2076, lang: 'Portuguese' },
+  'Mexico': { code: 2484, lang: 'Spanish' },
+  'Argentina': { code: 2032, lang: 'Spanish' },
+  'India': { code: 2356, lang: 'English' },
+  'South Korea': { code: 2410, lang: 'Korean' },
+  'United Arab Emirates': { code: 2784, lang: 'English' },
+};
+
+const DFS_DEFAULT_LOGIN = 'oscar@citystasher.com';
+const DFS_DEFAULT_PASSWORD = '6727fa4bdd436fac';
+
+function getDfsCredentials() {
+  const login = localStorage.getItem('dfs_login') || DFS_DEFAULT_LOGIN;
+  const password = localStorage.getItem('dfs_password') || DFS_DEFAULT_PASSWORD;
+  if (!login || !password) return null;
+  return { login, password, auth: 'Basic ' + btoa(login + ':' + password) };
+}
+
+function setDfsCredentials(login, password) {
+  localStorage.setItem('dfs_login', login);
+  localStorage.setItem('dfs_password', password);
+  updateSeoButtonState();
+}
+
+function clearDfsCredentials() {
+  localStorage.removeItem('dfs_login');
+  localStorage.removeItem('dfs_password');
+  updateSeoButtonState();
+}
+
+function updateSeoButtonState() {
+  const btn = document.getElementById('seoSettingsBtn');
+  const creds = getDfsCredentials();
+  if (creds) {
+    btn.classList.add('connected');
+    btn.textContent = '\u2699 SEO API \u2713';
+  } else {
+    btn.classList.remove('connected');
+    btn.textContent = '\u2699 SEO API';
+  }
+}
+
+// Modal handlers
+document.getElementById('seoSettingsBtn').addEventListener('click', () => {
+  const modal = document.getElementById('seoModal');
+  const creds = getDfsCredentials();
+  if (creds) {
+    document.getElementById('dfsLogin').value = creds.login;
+    document.getElementById('dfsPassword').value = creds.password;
+  }
+  document.getElementById('dfsStatus').style.display = 'none';
+  modal.classList.add('active');
+});
+
+document.getElementById('dfsCancel').addEventListener('click', () => {
+  document.getElementById('seoModal').classList.remove('active');
+});
+
+document.getElementById('seoModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('active');
+});
+
+document.getElementById('dfsClear').addEventListener('click', () => {
+  clearDfsCredentials();
+  document.getElementById('dfsLogin').value = '';
+  document.getElementById('dfsPassword').value = '';
+  seoCache.clear();
+  const status = document.getElementById('dfsStatus');
+  status.style.display = 'block';
+  status.style.color = 'var(--text-muted)';
+  status.textContent = 'Credentials cleared.';
+  // Re-render table to remove SEO data
+  renderTable();
+});
+
+document.getElementById('dfsSave').addEventListener('click', async () => {
+  const login = document.getElementById('dfsLogin').value.trim();
+  const password = document.getElementById('dfsPassword').value.trim();
+  const status = document.getElementById('dfsStatus');
+
+  if (!login || !password) {
+    status.style.display = 'block';
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Please enter both login and password.';
+    return;
+  }
+
+  status.style.display = 'block';
+  status.style.color = 'var(--text-muted)';
+  status.textContent = 'Testing connection...';
+
+  try {
+    const resp = await fetch('https://api.dataforseo.com/v3/appendix/user_data', {
+      method: 'GET',
+      headers: { 'Authorization': 'Basic ' + btoa(login + ':' + password) },
+    });
+    const data = await resp.json();
+    if (data.status_code === 20000) {
+      setDfsCredentials(login, password);
+      const balance = data.tasks?.[0]?.result?.[0]?.money?.balance;
+      status.style.color = 'var(--success)';
+      status.textContent = 'Connected!' + (balance != null ? ` Balance: $${balance.toFixed(2)}` : '');
+      setTimeout(() => document.getElementById('seoModal').classList.remove('active'), 1500);
+    } else {
+      status.style.color = 'var(--danger)';
+      status.textContent = 'Auth failed: ' + (data.status_message || 'Invalid credentials');
+    }
+  } catch(err) {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Connection error: ' + err.message;
+  }
+});
+
+const SEO_MIN_VOLUME_THRESHOLD = 50; // If location-level total volume is below this, fall back to city
+
+function buildSeoKeywords(term) {
+  const t = term.toLowerCase();
+  return [
+    `luggage storage ${t}`,
+    `bag storage ${t}`,
+    `left luggage ${t}`,
+    `luggage locker ${t}`,
+  ];
+}
+
+function getLocationSearchTerm(name) {
+  // Extract a clean search term from the location name
+  // Strip common suffixes like "Train Station", "Airport", "Bus Station" etc.
+  if (!name) return null;
+  let term = name
+    .replace(/\s*\(.*?\)\s*/g, '') // remove parentheticals
+    .replace(/\b(train station|railway station|bus station|airport|tube station|metro station|underground station|central station|main station|station)\b/gi, '')
+    .replace(/\b(international|domestic|terminal)\b/gi, '')
+    .trim();
+  // If the cleaned term is too short or same as common words, skip
+  if (term.length < 3) return null;
+  return term;
+}
+
+async function fetchSearchVolume(keywords, locInfo, creds) {
+  const resp = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/historical_search_volume/live', {
+    method: 'POST',
+    headers: { 'Authorization': creds.auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify([{
+      keywords,
+      location_code: locInfo.code,
+      language_name: locInfo.lang,
+      include_serp_info: true,
+    }]),
+  });
+  const data = await resp.json();
+  const kwResults = [];
+  let totalVol = 0;
+  if (data.status_code === 20000 && data.tasks?.[0]?.result?.[0]?.items) {
+    data.tasks[0].result[0].items.forEach(item => {
+      const sv = item.keyword_info?.search_volume || 0;
+      totalVol += sv;
+      const monthly = item.keyword_info?.monthly_searches || [];
+      const recent = monthly.slice(0, 3).map(m => m.search_volume || 0);
+      kwResults.push({
+        keyword: item.keyword,
+        volume: sv,
+        cpc: item.keyword_info?.cpc || 0,
+        competition: item.keyword_info?.competition_level || '—',
+        trend: recent,
+      });
+    });
+  }
+  return { keywords: kwResults, totalVol };
+}
+
+async function fetchSerpRanking(keyword, locInfo, creds) {
+  const resp = await fetch('https://api.dataforseo.com/v3/serp/google/organic/live/regular', {
+    method: 'POST',
+    headers: { 'Authorization': creds.auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify([{
+      keyword,
+      location_code: locInfo.code,
+      language_name: locInfo.lang,
+      depth: 100,
+    }]),
+  });
+  const data = await resp.json();
+  let stasherRank = null;
+  let stasherUrl = null;
+  const competitors = [];
+  if (data.status_code === 20000 && data.tasks?.[0]?.result?.[0]?.items) {
+    data.tasks[0].result[0].items.forEach(item => {
+      if (item.type !== 'organic') return;
+      const domain = item.domain || '';
+      if (domain.includes('stasher.com') && stasherRank === null) {
+        stasherRank = item.rank_absolute;
+        stasherUrl = item.url;
+      }
+      if (competitors.length < 5 && !domain.includes('stasher.com')) {
+        competitors.push({ domain, position: item.rank_absolute, url: item.url, title: item.title });
+      }
+    });
+  }
+  return { rank: stasherRank, stasherUrl, competitors };
+}
+
+async function fetchMapsSerp(keyword, locInfo, creds, lat, lng) {
+  try {
+    const reqBody = {
+      keyword,
+      location_code: locInfo.code,
+      language_name: locInfo.lang,
+      depth: 20,
+    };
+    // Use GPS coordinates if available for precise local results
+    if (lat != null && lng != null) {
+      reqBody.location_coordinate = `${lat},${lng},15z`;
+    }
+    const resp = await fetch('https://api.dataforseo.com/v3/serp/google/maps/live/advanced', {
+      method: 'POST',
+      headers: { 'Authorization': creds.auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify([reqBody]),
+    });
+    const data = await resp.json();
+    let stasherMapsRank = null;
+    let stasherMapsListing = null;
+    const mapsResults = [];
+    if (data.status_code === 20000 && data.tasks?.[0]?.result?.[0]?.items) {
+      data.tasks[0].result[0].items.forEach(item => {
+        if (item.type !== 'maps_search') return;
+        const title = (item.title || '').toLowerCase();
+        const domain = (item.domain || '').toLowerCase();
+        const listing = {
+          position: item.rank_absolute,
+          title: item.title,
+          address: item.address,
+          rating: item.rating?.value || null,
+          reviews: item.rating?.votes_count || 0,
+          category: item.category || '',
+          domain: item.domain || '',
+          phone: item.phone || '',
+          workHours: item.work_hours?.work_hours || null,
+          currentStatus: item.work_hours?.current || null,
+          url: item.url || '',
+          cid: item.cid || '',
+        };
+        const isStasherListing = title.includes('stasher') || domain.includes('stasher.com') || (item.url || '').toLowerCase().includes('stasher.com');
+        if (isStasherListing && stasherMapsRank === null) {
+          stasherMapsRank = item.rank_absolute;
+          stasherMapsListing = listing;
+        }
+        if (mapsResults.length < 10) {
+          mapsResults.push(listing);
+        }
+      });
+    }
+    return { stasherMapsRank, stasherMapsListing, mapsResults };
+  } catch(err) {
+    console.error('Maps SERP error:', err);
+    return { stasherMapsRank: null, stasherMapsListing: null, mapsResults: [] };
+  }
+}
+
+async function fetchSeoData(locationName, city, country, lat, lng) {
+  const cacheKey = `${locationName || ''}|${city}|${country}`;
+  if (seoCache.has(cacheKey)) return seoCache.get(cacheKey);
+
+  const creds = getDfsCredentials();
+  if (!creds) return null;
+
+  const locInfo = COUNTRY_LOCATION_MAP[country] || { code: 2826, lang: 'English' };
+  const result = { volume: null, rank: null, keywords: [], competitors: [], loading: false, level: 'city' };
+
+  try {
+    // Step 1: Try location-level keywords first (e.g. "luggage storage charing cross")
+    const locTerm = getLocationSearchTerm(locationName);
+    let usedLocationLevel = false;
+
+    if (locTerm && locTerm.toLowerCase() !== city.toLowerCase()) {
+      const locKeywords = buildSeoKeywords(locTerm);
+      const locVol = await fetchSearchVolume(locKeywords, locInfo, creds);
+
+      if (locVol.totalVol >= SEO_MIN_VOLUME_THRESHOLD) {
+        // Location-level has enough volume — use it
+        result.keywords = locVol.keywords;
+        result.volume = locVol.totalVol;
+        result.level = 'location';
+        result.searchTerm = locTerm;
+        usedLocationLevel = true;
+
+        // SERP check for the top location keyword
+        const topKw = locVol.keywords.reduce((a, b) => (b.volume > a.volume ? b : a), locVol.keywords[0]);
+        // For Maps, use the full location name for better local matching
+        const mapsKeyword = `luggage storage ${locationName || locTerm}`;
+        const [serpResult, mapsResult] = await Promise.all([
+          fetchSerpRanking(topKw.keyword, locInfo, creds),
+          fetchMapsSerp(mapsKeyword, locInfo, creds, lat, lng),
+        ]);
+        result.rank = serpResult.rank;
+        result.stasherUrl = serpResult.stasherUrl;
+        result.competitors = serpResult.competitors;
+        result.mapsRank = mapsResult.stasherMapsRank;
+        result.mapsListing = mapsResult.stasherMapsListing;
+        result.mapsResults = mapsResult.mapsResults;
+        result.mapsKeyword = mapsKeyword;
+      } else {
+        // Location-level volume too low — include it as supplementary info
+        result.locationKeywords = locVol.keywords;
+        result.locationVolume = locVol.totalVol;
+        result.locationTerm = locTerm;
+      }
+    }
+
+    // Step 2: If location-level wasn't enough, fetch city-level
+    if (!usedLocationLevel) {
+      const cityKeywords = buildSeoKeywords(city);
+      const cityVol = await fetchSearchVolume(cityKeywords, locInfo, creds);
+      result.keywords = cityVol.keywords;
+      result.volume = cityVol.totalVol;
+      result.level = 'city';
+      result.searchTerm = city;
+
+      // SERP + Maps check (even if keywords empty, still check SERP/Maps)
+      const organicKeyword = cityVol.keywords.length > 0
+        ? cityVol.keywords.reduce((a, b) => (b.volume > a.volume ? b : a), cityVol.keywords[0]).keyword
+        : `luggage storage ${city}`;
+      const mapsKeyword = locationName ? `luggage storage ${locationName}` : `luggage storage ${city}`;
+
+      const promises = [
+        fetchSerpRanking(organicKeyword, locInfo, creds),
+        fetchMapsSerp(mapsKeyword, locInfo, creds, lat, lng),
+      ];
+      const [serpResult, mapsResult] = await Promise.all(promises);
+      result.rank = serpResult.rank;
+      result.stasherUrl = serpResult.stasherUrl;
+      result.competitors = serpResult.competitors;
+      result.mapsRank = mapsResult.stasherMapsRank;
+      result.mapsListing = mapsResult.stasherMapsListing;
+      result.mapsResults = mapsResult.mapsResults;
+      result.mapsKeyword = mapsKeyword;
+    }
+  } catch(err) {
+    console.error('DataForSEO error:', err);
+  }
+
+  result.timestamp = Date.now();
+  seoCache.set(cacheKey, result);
+
+  // Update table cells for this location
+  updateSeoTableCells(locationName, city, country);
+
+  return result;
+}
+
+// Legacy compat for table updates
+function updateSeoTableCells(locationName, city, country) {
+  // Update all rows for this specific location
+  document.querySelectorAll(`tr[data-seo-city="${city}"][data-seo-country="${country}"]`).forEach(tr => {
+    const rowName = tr.querySelector('td:nth-child(2)')?.textContent?.trim();
+    const cacheKey = `${rowName || ''}|${city}|${country}`;
+    const data = seoCache.get(cacheKey);
+    if (!data) return;
+    const volCell = tr.querySelector('.seo-vol-cell');
+    const rankCell = tr.querySelector('.seo-rank-cell');
+    if (volCell && data.volume != null) {
+      volCell.textContent = data.volume >= 1000 ? (data.volume / 1000).toFixed(1) + 'k' : data.volume;
+    }
+    if (rankCell && data.rank != null) {
+      const cls = data.rank <= 10 ? 'serp-top10' : data.rank <= 30 ? 'serp-top30' : 'serp-low';
+      rankCell.innerHTML = `<span class="serp-badge ${cls}">#${data.rank}</span>`;
+    } else if (rankCell && data.volume != null && data.rank === null) {
+      rankCell.innerHTML = `<span class="serp-badge serp-nr">N/R</span>`;
+    }
+  });
+}
+
+function getSerpBadgeHtml(rank) {
+  if (rank == null) return '—';
+  if (rank <= 10) return `<span class="serp-badge serp-top10">#${rank}</span>`;
+  if (rank <= 30) return `<span class="serp-badge serp-top30">#${rank}</span>`;
+  return `<span class="serp-badge serp-low">#${rank}</span>`;
+}
+
+function renderSeoKeywordTable(keywords) {
+  if (!keywords || keywords.length === 0) return '';
+  let html = `<table class="seo-kw-table">
+    <thead><tr><th>Keyword</th><th>Volume</th><th>CPC</th><th>Comp.</th></tr></thead>
+    <tbody>`;
+  keywords.forEach(kw => {
+    const trendArrow = kw.trend.length >= 2
+      ? (kw.trend[0] > kw.trend[1] ? '<span style="color:var(--success)">&#9650;</span>' : kw.trend[0] < kw.trend[1] ? '<span style="color:var(--danger)">&#9660;</span>' : '<span style="color:var(--text-muted)">&#9644;</span>')
+      : '';
+    html += `<tr>
+      <td style="color:var(--text)">${kw.keyword}</td>
+      <td>${kw.volume?.toLocaleString() || '—'} ${trendArrow}</td>
+      <td>$${kw.cpc?.toFixed(2) || '—'}</td>
+      <td>${kw.competition}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderSeoDetail(seoData) {
+  const container = document.getElementById('seoDetail');
+  if (!container) return;
+
+  if (!seoData) {
+    const creds = getDfsCredentials();
+    container.innerHTML = creds
+      ? '<div class="seo-loading"><div class="seo-spinner"></div> Fetching SEO data...</div>'
+      : '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Configure DataForSEO API credentials to see SEO data</div>';
+    return;
+  }
+
+  let html = '';
+
+  // Level indicator
+  const levelLabel = seoData.level === 'location' ? `Location-level` : `City-level`;
+  const levelColor = seoData.level === 'location' ? 'var(--cyan)' : 'var(--warning)';
+  html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${levelColor};flex-shrink:0;"></span>
+    <span style="font-size:11px;color:${levelColor};font-weight:600;">${levelLabel}</span>
+    <span style="font-size:11px;color:var(--text-muted);">— "${seoData.searchTerm || ''}"</span>
+  </div>`;
+
+  // If we fell back to city but have location data, show location keywords first
+  if (seoData.level === 'city' && seoData.locationKeywords && seoData.locationKeywords.length > 0) {
+    const locVol = seoData.locationVolume || 0;
+    html += `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin-bottom:6px;">
+      Location: "${seoData.locationTerm}" <span style="color:var(--danger);font-weight:400;">(vol. ${locVol} — below threshold, showing city)</span>
+    </div>`;
+    html += renderSeoKeywordTable(seoData.locationKeywords);
+    html += `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--warning);margin:12px 0 6px;">City-level: "${seoData.searchTerm}"</div>`;
+  }
+
+  // Main keyword breakdown
+  html += renderSeoKeywordTable(seoData.keywords);
+
+  // Stasher SERP position
+  html += `<div class="detail-stat-row" style="margin-bottom:4px">
+    <span class="stat-label">Stasher Organic Position</span>
+    <span class="stat-value">${seoData.rank != null ? getSerpBadgeHtml(seoData.rank) : '<span class="serp-badge serp-nr">Not Ranking</span>'}</span>
+  </div>`;
+
+  if (seoData.stasherUrl) {
+    html += `<div style="font-size:11px;margin-bottom:8px;"><a href="${seoData.stasherUrl}" target="_blank" style="color:var(--accent-light);text-decoration:none;word-break:break-all;">${seoData.stasherUrl}</a></div>`;
+  }
+
+  // #1 Organic rank
+  if (seoData.competitors && seoData.competitors.length > 0) {
+    const first = seoData.competitors[0];
+    html += `<div class="detail-stat-row" style="padding:6px 0;">
+      <span class="stat-label">#1 Organic</span>
+      <span class="stat-value" style="font-size:12px;"><a href="${first.url}" target="_blank" style="color:var(--text);text-decoration:none;">${first.domain}</a></span>
+    </div>`;
+  }
+
+  // Competitors
+  if (seoData.competitors.length > 0) {
+    html += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:8px 0 6px;">Top Organic Competitors</div>';
+    seoData.competitors.forEach(c => {
+      html += `<div class="seo-competitor">
+        <a href="${c.url}" target="_blank" style="color:var(--text);text-decoration:none;font-weight:500;">${c.domain}</a>
+        <span class="comp-pos">#${c.position}</span>
+      </div>`;
+    });
+  }
+
+  // Google Maps SERP
+  if (seoData.mapsResults && seoData.mapsResults.length > 0) {
+    html += `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--cyan);margin-bottom:4px;">Google Maps Pack</div>
+      ${seoData.mapsKeyword ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">Query: "${seoData.mapsKeyword}" + GPS</div>` : ''}`;
+
+    // Stasher Maps position
+    if (seoData.mapsRank != null) {
+      const mapsCls = seoData.mapsRank <= 3 ? 'serp-top10' : seoData.mapsRank <= 10 ? 'serp-top30' : 'serp-low';
+      html += `<div class="detail-stat-row" style="padding:6px 0;">
+        <span class="stat-label">Stasher Maps Position</span>
+        <span class="stat-value"><span class="serp-badge ${mapsCls}">#${seoData.mapsRank}</span></span>
+      </div>`;
+      if (seoData.mapsListing) {
+        const ml = seoData.mapsListing;
+        html += `<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
+          ${ml.rating ? `${ml.rating}&#9733; (${ml.reviews} reviews)` : 'No rating'} &middot; ${ml.category || '—'}
+          ${ml.currentStatus ? ` &middot; <span style="color:${ml.currentStatus === 'open' ? 'var(--success)' : 'var(--danger)'};">${ml.currentStatus}</span>` : ''}
+        </div>`;
+      }
+    } else {
+      html += `<div class="detail-stat-row" style="padding:6px 0;">
+        <span class="stat-label">Stasher Maps Position</span>
+        <span class="stat-value"><span class="serp-badge serp-nr">Not in Maps</span></span>
+      </div>`;
+    }
+
+    // #1 Maps rank
+    const firstMap = seoData.mapsResults[0];
+    if (firstMap) {
+      const mapsUrl = firstMap.cid ? `https://www.google.com/maps?cid=${firstMap.cid}` : (firstMap.url || '#');
+      html += `<div class="detail-stat-row" style="padding:6px 0;">
+        <span class="stat-label">#1 Maps</span>
+        <span class="stat-value" style="font-size:12px;"><a href="${mapsUrl}" target="_blank" style="color:var(--text);text-decoration:none;">${firstMap.title}</a></span>
+      </div>`;
+    }
+
+    // Top Maps listings
+    html += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:8px 0 6px;">Maps Listings</div>';
+    seoData.mapsResults.slice(0, 5).forEach(m => {
+      const isStasher = (m.title || '').toLowerCase().includes('stasher') || (m.domain || '').includes('stasher.com');
+      const ratingStr = m.rating ? `${m.rating}&#9733;(${m.reviews})` : '';
+      const listingUrl = m.cid ? `https://www.google.com/maps?cid=${m.cid}` : (m.url || '');
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(30,41,59,0.5);${isStasher ? 'background:rgba(99,102,241,0.08);margin:0 -4px;padding:5px 4px;border-radius:4px;' : ''}">
+        <div style="max-width:200px;">
+          <div style="font-weight:${isStasher ? '700' : '500'};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${listingUrl ? `<a href="${listingUrl}" target="_blank" style="color:${isStasher ? 'var(--accent-light)' : 'var(--text)'};text-decoration:none;">${m.title}</a>` : m.title}</div>
+          <div style="font-size:10px;color:var(--text-muted);">${m.category} ${ratingStr}</div>
+        </div>
+        <span style="color:var(--text-muted);font-size:12px;font-weight:600;">#${m.position}</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+// ─── Tab System ───
+let activeTab = 'opportunity';
+let fullMap = null;
+let fullMapMarkers = [];
+
+function switchTab(tabName) {
+  activeTab = tabName;
+
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(tc => {
+    tc.classList.toggle('active', tc.id === 'tab-' + tabName);
+  });
+
+  // Toggle layout for map
+  const layout = document.querySelector('.layout');
+  const minimapPanel = document.getElementById('minimapPanel');
+  if (tabName === 'map') {
+    layout.classList.add('map-active');
+  } else {
+    layout.classList.remove('map-active');
+  }
+
+  // Render tab-specific content
+  if (tabName === 'opportunity') {
+    setTimeout(() => renderScatter(), 50);
+  } else if (tabName === 'performing') {
+    renderPerformingTab();
+  } else if (tabName === 'underperforming') {
+    renderUnderperformingTab();
+  } else if (tabName === 'seo') {
+    renderSeoTab();
+  } else if (tabName === 'map') {
+    setTimeout(() => renderMapTab(), 50);
+  }
+}
+
+// Tab button listeners
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ─── Performing Tab ───
+function renderPerformingTab() {
+  const perfData = filteredData.filter(d => d.conversion_rate > 0.08);
+  perfData.sort((a, b) => b.conversion_rate - a.conversion_rate);
+
+  // KPIs
+  const total = perfData.length;
+  const totalSearches = perfData.reduce((s, d) => s + d.searches, 0);
+  const totalConv = perfData.reduce((s, d) => s + d.conversions, 0);
+  const avgConv = totalSearches > 0 ? (totalConv / totalSearches * 100).toFixed(1) : 0;
+  const avgOpp = total > 0 ? Math.round(perfData.reduce((s, d) => s + d.opportunity_score, 0) / total) : 0;
+  const topCity = total > 0 ? (() => {
+    const cities = {};
+    perfData.forEach(d => { cities[d.city] = (cities[d.city] || 0) + 1; });
+    return Object.entries(cities).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+  })() : '—';
+
+  document.getElementById('perfKpiStrip').innerHTML = `
+    <div class="kpi-card">
+      <div class="label">Performing Locations</div>
+      <div class="value" style="color:var(--success)">${total}</div>
+      <div class="sub">above 8% CVR</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Total Searches</div>
+      <div class="value">${totalSearches.toLocaleString()}</div>
+      <div class="sub">in performing areas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg. Conversion</div>
+      <div class="value" style="color:var(--success)">${avgConv}%</div>
+      <div class="sub">well above benchmark</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg. Opp. Score</div>
+      <div class="value">${avgOpp}</div>
+      <div class="sub">lower = less opportunity</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Top City</div>
+      <div class="value" style="font-size:16px">${topCity}</div>
+      <div class="sub">most performing locations</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Share of Total</div>
+      <div class="value" style="color:var(--success)">${allData.length > 0 ? ((total / filteredData.length) * 100).toFixed(0) : 0}%</div>
+      <div class="sub">of filtered locations</div>
+    </div>
+  `;
+
+  // Table
+  const cols = [
+    { key: 'conversion_rate', label: 'Conv. Rate', width: '100px' },
+    { key: 'name', label: 'Location' },
+    { key: 'cvr_tier_label', label: 'CVR Tier', width: '110px' },
+    { key: 'type', label: 'Type', width: '110px' },
+    { key: 'city', label: 'City', width: '100px' },
+    { key: 'searches', label: 'Searches', width: '85px' },
+    { key: 'conversions', label: 'Conversions', width: '95px' },
+    { key: 'stashpoints', label: 'Stashpoints', width: '90px' },
+  ];
+
+  const thead = document.getElementById('perfTableHead');
+  thead.innerHTML = '<tr>' + cols.map(c =>
+    `<th style="${c.width ? 'width:'+c.width : ''}">${c.label}</th>`
+  ).join('') + '</tr>';
+
+  const tbody = document.getElementById('perfTableBody');
+  tbody.innerHTML = perfData.slice(0, 200).map((d, i) => {
+    const convClass = d.conversion_rate >= 0.15 ? 'conv-high' : d.conversion_rate >= 0.10 ? 'conv-med' : 'conv-high';
+    const spClass = d.stashpoints === 0 ? 'sp-none' : d.stashpoints < 5 ? 'sp-low' : 'sp-ok';
+    return `<tr class="row-performing" data-perf-idx="${i}">
+      <td><span class="conv-badge conv-high">${(d.conversion_rate * 100).toFixed(1)}%</span></td>
+      <td style="font-weight:500">${d.name || '—'}</td>
+      <td><span class="tier-badge ${d.cvr_tier.cls}">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></td>
+      <td>${d.type ? `<span class="type-tag">${d.type}</span>` : '—'}</td>
+      <td>${d.city}</td>
+      <td>${d.searches.toLocaleString()}</td>
+      <td>${d.conversions.toLocaleString()}</td>
+      <td><span class="sp-badge ${spClass}">${d.stashpoints}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Click to select
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const idx = parseInt(tr.dataset.perfIdx);
+      selectLocation(perfData[idx]);
+    });
+  });
+}
+
+// ─── Underperforming Tab ───
+function renderUnderperformingTab() {
+  const underData = filteredData.filter(d => d.conversion_rate <= 0.08);
+  underData.sort((a, b) => b.searches - a.searches);
+
+  // KPIs
+  const total = underData.length;
+  const totalSearches = underData.reduce((s, d) => s + d.searches, 0);
+  const totalConv = underData.reduce((s, d) => s + d.conversions, 0);
+  const avgConv = totalSearches > 0 ? (totalConv / totalSearches * 100).toFixed(1) : 0;
+  const totalMissed = underData.reduce((s, d) => s + d.missed_conversions, 0);
+  const zeroSP = underData.filter(d => d.stashpoints === 0).length;
+  const zeroCvr = underData.filter(d => d.conversion_rate === 0).length;
+
+  document.getElementById('underKpiStrip').innerHTML = `
+    <div class="kpi-card">
+      <div class="label">Underperforming</div>
+      <div class="value" style="color:var(--danger)">${total}</div>
+      <div class="sub">below 8% CVR</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Total Searches</div>
+      <div class="value">${totalSearches.toLocaleString()}</div>
+      <div class="sub">demand in these areas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg. Conversion</div>
+      <div class="value" style="color:var(--danger)">${avgConv}%</div>
+      <div class="sub">vs 15% benchmark</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Missed Conversions</div>
+      <div class="value" style="color:var(--danger)">${totalMissed.toLocaleString()}</div>
+      <div class="sub">revenue opportunity</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Zero Conversions</div>
+      <div class="value" style="color:var(--danger)">${zeroCvr}</div>
+      <div class="sub">${total > 0 ? ((zeroCvr / total * 100).toFixed(0)) : 0}% of underperformers</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Zero Stashpoints</div>
+      <div class="value" style="color:var(--danger)">${zeroSP}</div>
+      <div class="sub">${total > 0 ? ((zeroSP / total * 100).toFixed(0)) : 0}% have no supply</div>
+    </div>
+  `;
+
+  // Table — sorted by searches descending (highest demand first)
+  const cols = [
+    { key: 'searches', label: 'Searches', width: '90px' },
+    { key: 'name', label: 'Location' },
+    { key: 'cvr_tier_label', label: 'CVR Tier', width: '110px' },
+    { key: 'conversion_rate', label: 'Conv. Rate', width: '95px' },
+    { key: 'type', label: 'Type', width: '110px' },
+    { key: 'city', label: 'City', width: '100px' },
+    { key: 'stashpoints', label: 'Stashpoints', width: '90px' },
+    { key: 'missed_conversions', label: 'Missed Conv.', width: '95px' },
+    { key: 'opportunity_score', label: 'Score', width: '70px' },
+  ];
+
+  const thead = document.getElementById('underTableHead');
+  thead.innerHTML = '<tr>' + cols.map(c =>
+    `<th style="${c.width ? 'width:'+c.width : ''}">${c.label}</th>`
+  ).join('') + '</tr>';
+
+  const tbody = document.getElementById('underTableBody');
+  tbody.innerHTML = underData.slice(0, 200).map((d, i) => {
+    const convClass = d.conversion_rate < 0.04 ? 'conv-low' : d.conversion_rate < 0.07 ? 'conv-low' : 'conv-med';
+    const spClass = d.stashpoints === 0 ? 'sp-none' : d.stashpoints < 5 ? 'sp-low' : 'sp-ok';
+    const oppColor = d.opportunity_score >= 70 ? 'var(--danger)' : d.opportunity_score >= 50 ? 'var(--warning)' : 'var(--success)';
+    return `<tr data-under-idx="${i}">
+      <td style="font-weight:700">${d.searches.toLocaleString()}</td>
+      <td style="font-weight:500">${d.name || '—'}</td>
+      <td><span class="tier-badge ${d.cvr_tier.cls}">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></td>
+      <td><span class="conv-badge ${convClass}">${(d.conversion_rate * 100).toFixed(1)}%</span></td>
+      <td>${d.type ? `<span class="type-tag">${d.type}</span>` : '—'}</td>
+      <td>${d.city}</td>
+      <td><span class="sp-badge ${spClass}">${d.stashpoints}</span></td>
+      <td style="color:var(--danger);font-weight:600">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() : '—'}</td>
+      <td><span style="color:${oppColor};font-weight:700">${d.opportunity_score}</span></td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const idx = parseInt(tr.dataset.underIdx);
+      selectLocation(underData[idx]);
+    });
+  });
+}
+
+// ─── SEO Tab ───
+let seoSortCol = 'searches';
+let seoSortDir = 'desc';
+
+function renderSeoTab() {
+  // KPIs
+  const withSeo = filteredData.filter(d => {
+    const key = `${d.name || ''}|${d.city}|${d.country}`;
+    return seoCache.has(key);
+  });
+  const seoVolumes = withSeo.map(d => {
+    const key = `${d.name || ''}|${d.city}|${d.country}`;
+    return seoCache.get(key)?.volume || 0;
+  });
+  const seoRanks = withSeo.map(d => {
+    const key = `${d.name || ''}|${d.city}|${d.country}`;
+    return seoCache.get(key)?.rank;
+  }).filter(r => r != null);
+
+  const avgVol = seoVolumes.length > 0 ? Math.round(seoVolumes.reduce((a,b) => a+b, 0) / seoVolumes.length) : 0;
+  const avgRank = seoRanks.length > 0 ? (seoRanks.reduce((a,b) => a+b, 0) / seoRanks.length).toFixed(1) : '—';
+  const rankingCount = seoRanks.length;
+
+  document.getElementById('seoKpiStrip').innerHTML = `
+    <div class="kpi-card">
+      <div class="label">SEO Data Fetched</div>
+      <div class="value">${withSeo.length}</div>
+      <div class="sub">of ${filteredData.length} locations</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg. Search Volume</div>
+      <div class="value">${avgVol.toLocaleString()}</div>
+      <div class="sub">monthly across keywords</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Avg. SERP Position</div>
+      <div class="value" style="color:${typeof avgRank === 'number' || parseFloat(avgRank) <= 20 ? 'var(--success)' : 'var(--warning)'}">${avgRank}</div>
+      <div class="sub">${rankingCount} locations ranking</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Top 10 Rankings</div>
+      <div class="value" style="color:var(--success)">${seoRanks.filter(r => r <= 10).length}</div>
+      <div class="sub">first page of Google</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Not Ranking</div>
+      <div class="value" style="color:var(--danger)">${withSeo.length - rankingCount}</div>
+      <div class="sub">no organic position</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Coverage</div>
+      <div class="value">${filteredData.length > 0 ? ((withSeo.length / filteredData.length) * 100).toFixed(0) : 0}%</div>
+      <div class="sub">of locations checked</div>
+    </div>
+  `;
+
+  // Table — SEO columns prominent
+  const cols = [
+    { key: 'name', label: 'Location' },
+    { key: 'city', label: 'City', width: '100px' },
+    { key: 'seo_volume', label: 'SEO Vol.', width: '90px' },
+    { key: 'serp_rank', label: 'SERP Rank', width: '90px' },
+    { key: 'seo_level', label: 'Level', width: '80px' },
+    { key: 'searches', label: 'Searches', width: '85px' },
+    { key: 'conversion_rate', label: 'Conv. Rate', width: '95px' },
+    { key: 'opportunity_score', label: 'Score', width: '70px' },
+  ];
+
+  const thead = document.getElementById('seoTableHead');
+  thead.innerHTML = '<tr>' + cols.map(c =>
+    `<th data-seo-col="${c.key}" style="${c.width ? 'width:'+c.width : ''}" class="${seoSortCol === c.key ? 'sorted-' + seoSortDir : ''}">${c.label}</th>`
+  ).join('') + '</tr>';
+
+  thead.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.seoCol;
+      if (seoSortCol === col) seoSortDir = seoSortDir === 'asc' ? 'desc' : 'asc';
+      else { seoSortCol = col; seoSortDir = 'desc'; }
+      renderSeoTab();
+    });
+  });
+
+  // Sort
+  const sortedData = [...filteredData].sort((a, b) => {
+    let va, vb;
+    if (seoSortCol === 'seo_volume') {
+      const ka = `${a.name || ''}|${a.city}|${a.country}`;
+      const kb = `${b.name || ''}|${b.city}|${b.country}`;
+      va = seoCache.get(ka)?.volume || -1;
+      vb = seoCache.get(kb)?.volume || -1;
+    } else if (seoSortCol === 'serp_rank') {
+      const ka = `${a.name || ''}|${a.city}|${a.country}`;
+      const kb = `${b.name || ''}|${b.city}|${b.country}`;
+      va = seoCache.get(ka)?.rank || 999;
+      vb = seoCache.get(kb)?.rank || 999;
+    } else {
+      va = a[seoSortCol]; vb = b[seoSortCol];
+    }
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+    if (va < vb) return seoSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return seoSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const tbody = document.getElementById('seoTableBody');
+  tbody.innerHTML = sortedData.slice(0, 200).map((d, i) => {
+    const seoKey = `${d.name || ''}|${d.city}|${d.country}`;
+    const seo = seoCache.get(seoKey);
+    const vol = seo?.volume != null ? (seo.volume >= 1000 ? (seo.volume / 1000).toFixed(1) + 'k' : seo.volume) : '—';
+    const rank = seo ? (seo.rank != null ? getSerpBadgeHtml(seo.rank) : '<span class="serp-badge serp-nr">N/R</span>') : '—';
+    const level = seo?.level ? `<span style="color:${seo.level === 'location' ? 'var(--cyan)' : 'var(--warning)'}; font-size:11px;">${seo.level}</span>` : '—';
+    const convClass = d.conversion_rate < 0.07 ? 'conv-low' : d.conversion_rate < 0.12 ? 'conv-med' : 'conv-high';
+    const oppColor = d.opportunity_score >= 70 ? 'var(--danger)' : d.opportunity_score >= 50 ? 'var(--warning)' : 'var(--success)';
+
+    return `<tr data-seo-tab-idx="${i}">
+      <td style="font-weight:500">${d.name || '—'}</td>
+      <td>${d.city}</td>
+      <td>${vol}</td>
+      <td>${rank}</td>
+      <td>${level}</td>
+      <td>${d.searches.toLocaleString()}</td>
+      <td><span class="conv-badge ${convClass}">${(d.conversion_rate * 100).toFixed(1)}%</span></td>
+      <td><span style="color:${oppColor};font-weight:700">${d.opportunity_score}</span></td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const idx = parseInt(tr.dataset.seoTabIdx);
+      selectLocation(sortedData[idx]);
+    });
+  });
+}
+
+// SEO Fetch All button
+document.getElementById('seoFetchBtn').addEventListener('click', async function() {
+  const btn = this;
+  const progress = document.getElementById('seoFetchProgress');
+  btn.disabled = true;
+
+  const toFetch = filteredData.filter(d => {
+    const key = `${d.name || ''}|${d.city}|${d.country}`;
+    return !seoCache.has(key);
+  }).slice(0, 50); // Limit to 50 at a time
+
+  for (let i = 0; i < toFetch.length; i++) {
+    const d = toFetch[i];
+    progress.textContent = `Fetching ${i + 1}/${toFetch.length}...`;
+    await fetchSeoData(d.name, d.city, d.country, d.lat, d.lng);
+    // Small delay to avoid rate limiting
+    if (i < toFetch.length - 1) await new Promise(r => setTimeout(r, 500));
+  }
+
+  progress.textContent = `Done! ${toFetch.length} fetched.`;
+  btn.disabled = false;
+  renderSeoTab();
+  setTimeout(() => { progress.textContent = ''; }, 3000);
+});
+
+// ─── Map Tab ───
+// Cluster POIs within a given radius (km) using greedy clustering
+function clusterPois(data, radiusKm) {
+  const used = new Set();
+  const clusters = [];
+  // Sort by searches desc so highest-demand POI becomes cluster center
+  const sorted = [...data].sort((a, b) => b.searches - a.searches);
+  sorted.forEach((d, i) => {
+    if (used.has(i)) return;
+    used.add(i);
+    const cluster = { pois: [d], lat: d.lat, lng: d.lng };
+    // Find all unused POIs within radius
+    sorted.forEach((other, j) => {
+      if (j === i || used.has(j)) return;
+      if (haversine(d.lat, d.lng, other.lat, other.lng) <= radiusKm) {
+        cluster.pois.push(other);
+        used.add(j);
+      }
+    });
+    // Weighted centroid by searches
+    const totalS = cluster.pois.reduce((s, p) => s + p.searches, 0);
+    if (totalS > 0) {
+      cluster.lat = cluster.pois.reduce((s, p) => s + p.lat * p.searches, 0) / totalS;
+      cluster.lng = cluster.pois.reduce((s, p) => s + p.lng * p.searches, 0) / totalS;
+    }
+    clusters.push(cluster);
+  });
+  return clusters;
+}
+
+let showPoiMarkers = true;
+let showSpMarkers = true;
+let fullMapSpMarkers = [];
+
+function renderMapTab() {
+  if (!fullMap) {
+    fullMap = L.map('fullMap', {
+      zoomControl: true,
+      attributionControl: false,
+    }).setView([48, 2], 5);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+    }).addTo(fullMap);
+  }
+
+  // Clear old markers
+  fullMapMarkers.forEach(m => fullMap.removeLayer(m));
+  fullMapMarkers = [];
+  fullMapSpMarkers.forEach(m => fullMap.removeLayer(m));
+  fullMapSpMarkers = [];
+
+  // POI demand markers — aggregate within 500m
+  if (showPoiMarkers) {
+    const clusters = clusterPois(filteredData, 0.5);
+    clusters.forEach(cluster => {
+      const totalSearches = cluster.pois.reduce((s, d) => s + d.searches, 0);
+      const totalConv = cluster.pois.reduce((s, d) => s + d.conversions, 0);
+      const avgCvr = totalSearches > 0 ? totalConv / totalSearches : 0;
+      const avgOpp = Math.round(cluster.pois.reduce((s, d) => s + d.opportunity_score, 0) / cluster.pois.length);
+      const color = avgCvr > 0.08 ? '#34d399' : avgCvr >= 0.04 ? '#fbbf24' : '#f87171';
+      const radius = Math.max(5, Math.min(18, Math.sqrt(totalSearches / 30)));
+
+      const marker = L.circleMarker([cluster.lat, cluster.lng], {
+        radius: radius,
+        fillColor: color,
+        color: 'rgba(255,255,255,0.4)',
+        weight: cluster.pois.length > 1 ? 2 : 1,
+        fillOpacity: 0.75,
+      }).addTo(fullMap);
+
+      const nearbySp = findNearbyStashpoints(cluster.lat, cluster.lng, 0.5);
+      const activeSp = nearbySp.filter(sp => sp.active);
+      const totalCap = activeSp.reduce((s, sp) => s + sp.capacity, 0);
+      const topPoi = cluster.pois.sort((a, b) => b.searches - a.searches)[0];
+
+      const poiListHtml = cluster.pois.length > 1
+        ? `<div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,0.6);">${cluster.pois.slice(0, 5).map(p => `${p.name || 'Area'} (${p.searches} srch)`).join('<br>')}${cluster.pois.length > 5 ? `<br>+${cluster.pois.length - 5} more` : ''}</div>`
+        : '';
+
+      marker.bindPopup(`
+        <div style="font-size:13px;min-width:220px;">
+          <div style="font-weight:700;margin-bottom:2px;">${cluster.pois.length > 1 ? topPoi.city + ' — ' + cluster.pois.length + ' POIs' : (topPoi.name || topPoi.city + ' Area')}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.6);">${topPoi.city}, ${topPoi.country}${cluster.pois.length === 1 ? ' &middot; ' + (topPoi.type || '—') : ''}</div>
+          ${poiListHtml}
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
+          <div>Total Searches: <b>${totalSearches.toLocaleString()}</b></div>
+          <div>Avg CVR: <b style="color:${color}">${(avgCvr * 100).toFixed(1)}%</b></div>
+          <div>Avg Opportunity: <b>${avgOpp}/100</b></div>
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
+          <div style="color:#38bdf8;">Active StashPoints: <b>${activeSp.length}</b></div>
+          <div style="color:#38bdf8;">Total capacity: <b>${totalCap} bags</b></div>
+          ${totalCap === 0 && totalSearches > 0 ? '<div style="color:#f87171;font-weight:600;margin-top:4px;">&#9888; Supply gap!</div>' : ''}
+        </div>
+      `);
+
+      fullMapMarkers.push(marker);
+    });
+  }
+
+  // StashPoint supply markers
+  if (showSpMarkers) {
+    allStashpoints.forEach(sp => {
+      const isActive = sp.active;
+      const marker = L.circleMarker([sp.lat, sp.lng], {
+        radius: 3,
+        fillColor: isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)',
+        color: isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)',
+        weight: 1,
+        fillOpacity: isActive ? 0.7 : 0.3,
+      }).addTo(fullMap);
+
+      const avgRating = sp.reviews > 0 ? (sp.rating / sp.reviews).toFixed(1) : '—';
+      marker.bindPopup(`
+        <div style="font-size:13px;min-width:180px;">
+          <div style="font-weight:700;margin-bottom:2px;color:#38bdf8;">${sp.name}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">${sp.locationName}</div>
+          <div>${sp.address}</div>
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
+          <div>Capacity: <b>${sp.capacity} bags</b></div>
+          <div>Bookings: <b>${sp.bookings}</b></div>
+          <div>Rating: <b>${avgRating}</b> (${sp.reviews} reviews)</div>
+          <div>Status: <b style="color:${isActive ? '#34d399' : '#f87171'}">${isActive ? 'Active' : 'Inactive'}</b></div>
+          <div>Type: ${sp.type || '—'}</div>
+          ${sp.open24 ? '<div style="color:#34d399;">Open 24/7</div>' : ''}
+          ${sp.openLate ? '<div style="color:#fbbf24;">Open Late</div>' : ''}
+        </div>
+      `);
+
+      fullMapSpMarkers.push(marker);
+    });
+  }
+
+  setTimeout(() => fullMap.invalidateSize(), 100);
+
+  if (filteredData.length > 0) {
+    const bounds = L.latLngBounds(filteredData.map(d => [d.lat, d.lng]));
+    fullMap.fitBounds(bounds, { padding: [30, 30] });
+  }
+}
+
+// Map toggle handlers
+document.getElementById('mapTogglePoi').addEventListener('click', function() {
+  showPoiMarkers = !showPoiMarkers;
+  this.classList.toggle('active', showPoiMarkers);
+  renderMapTab();
+});
+document.getElementById('mapToggleSp').addEventListener('click', function() {
+  showSpMarkers = !showSpMarkers;
+  this.classList.toggle('active', showSpMarkers);
+  renderMapTab();
+});
+
+// Map search — find and zoom to a location
+document.getElementById('mapSearchBox').addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  const q = this.value.trim().toLowerCase();
+  if (!q) return;
+
+  // Search POIs first
+  const poiMatch = filteredData.find(d =>
+    d.name.toLowerCase().includes(q) || d.city.toLowerCase().includes(q)
+  );
+  if (poiMatch && fullMap) {
+    fullMap.setView([poiMatch.lat, poiMatch.lng], 14);
+    // Open the cluster popup that contains this POI
+    for (const m of fullMapMarkers) {
+      const ll = m.getLatLng();
+      if (haversine(ll.lat, ll.lng, poiMatch.lat, poiMatch.lng) < 1.5) {
+        m.openPopup();
+        break;
+      }
+    }
+    return;
+  }
+
+  // Search StashPoints
+  const spMatch = allStashpoints.find(sp =>
+    sp.name.toLowerCase().includes(q) || sp.locationName.toLowerCase().includes(q) || sp.address.toLowerCase().includes(q)
+  );
+  if (spMatch && fullMap) {
+    fullMap.setView([spMatch.lat, spMatch.lng], 16);
+    for (const m of fullMapSpMarkers) {
+      const ll = m.getLatLng();
+      if (haversine(ll.lat, ll.lng, spMatch.lat, spMatch.lng) < 0.05) {
+        m.openPopup();
+        break;
+      }
+    }
+    return;
+  }
+
+  // Fallback: geocode via Nominatim
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`)
+    .then(r => r.json())
+    .then(results => {
+      if (results.length > 0 && fullMap) {
+        fullMap.setView([parseFloat(results[0].lat), parseFloat(results[0].lon)], 13);
+      }
+    }).catch(() => {});
+});
+
+// ─── Supply/Demand Detail ───
+function renderSupplyDetail(d) {
+  const container = document.getElementById('supplyDetail');
+  if (!container) return;
+
+  const nearbySp = findNearbyStashpoints(d.lat, d.lng, 0.5);
+  const activeSp = nearbySp.filter(sp => sp.active);
+  const totalCap = activeSp.reduce((s, sp) => s + sp.capacity, 0);
+  const totalBookings = activeSp.reduce((s, sp) => s + sp.bookings, 0);
+
+  // Supply score: capacity relative to demand
+  const demandEstimate = d.searches * 0.15; // assume 15% benchmark conversion
+  const supplyRatio = demandEstimate > 0 ? Math.min(totalCap / demandEstimate, 2) : 0;
+  const supplyColor = supplyRatio >= 1 ? 'var(--success)' : supplyRatio >= 0.5 ? 'var(--warning)' : 'var(--danger)';
+  const supplyLabel = supplyRatio >= 1 ? 'Well Supplied' : supplyRatio >= 0.5 ? 'Undersupplied' : 'Supply Gap';
+
+  let html = '';
+
+  // Supply vs Demand bar
+  html += `<div class="detail-stat-row">
+    <span class="stat-label">Supply Status</span>
+    <span class="stat-value" style="color:${supplyColor};font-size:12px;">${supplyLabel}</span>
+  </div>`;
+  html += `<div class="supply-gap-bar">
+    <div class="supply-gap-fill" style="width:${Math.min(supplyRatio * 100, 100).toFixed(0)}%;background:${supplyColor};"></div>
+  </div>`;
+  html += `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:12px;">
+    <span>Capacity: ${totalCap} bags</span>
+    <span>Est. demand: ~${Math.round(demandEstimate)} bags</span>
+  </div>`;
+
+  // Summary stats
+  html += `<div class="detail-stat-row">
+    <span class="stat-label">Active StashPoints (500m)</span>
+    <span class="stat-value" style="color:var(--cyan)">${activeSp.length}</span>
+  </div>`;
+  html += `<div class="detail-stat-row">
+    <span class="stat-label">Total Capacity</span>
+    <span class="stat-value">${totalCap} bags</span>
+  </div>`;
+  html += `<div class="detail-stat-row">
+    <span class="stat-label">Total Bookings</span>
+    <span class="stat-value">${totalBookings.toLocaleString()}</span>
+  </div>`;
+
+  if (nearbySp.filter(sp => !sp.active).length > 0) {
+    html += `<div class="detail-stat-row">
+      <span class="stat-label">Inactive StashPoints</span>
+      <span class="stat-value" style="color:var(--text-muted)">${nearbySp.filter(sp => !sp.active).length}</span>
+    </div>`;
+  }
+
+  // Availability summary
+  if (activeSp.length > 0) {
+    const open24Count = activeSp.filter(sp => sp.open24).length;
+    const openLateCount = activeSp.filter(sp => sp.openLate && !sp.open24).length;
+    const standardCount = activeSp.length - open24Count - openLateCount;
+    const holidayOpen = activeSp.filter(sp => sp.holidayOpen === 'default_schedule' || sp.holidayOpen === 'open').length;
+    const holidayClosed = activeSp.filter(sp => sp.holidayOpen === 'closed' || sp.holidayOpen === 'closed_plus').length;
+
+    html += `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--cyan);margin-bottom:8px;">Availability</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        ${open24Count > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;font-weight:600;">${open24Count} open 24/7</span>` : ''}
+        ${openLateCount > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(245,158,11,0.15);color:#fbbf24;font-weight:600;">${openLateCount} open late</span>` : ''}
+        ${standardCount > 0 ? `<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(148,163,184,0.1);color:var(--text-muted);font-weight:600;">${standardCount} standard hours</span>` : ''}
+      </div>`;
+
+    // Coverage assessment
+    const lateOrAlwaysPct = ((open24Count + openLateCount) / activeSp.length * 100).toFixed(0);
+    const coverageColor = lateOrAlwaysPct >= 50 ? 'var(--success)' : lateOrAlwaysPct >= 25 ? 'var(--warning)' : 'var(--danger)';
+    const coverageLabel = lateOrAlwaysPct >= 50 ? 'Good evening cover' : lateOrAlwaysPct >= 25 ? 'Limited evening cover' : 'Poor evening cover';
+    html += `<div class="detail-stat-row" style="padding:6px 0;">
+      <span class="stat-label">Evening / Late Cover</span>
+      <span class="stat-value" style="color:${coverageColor};font-size:12px;">${lateOrAlwaysPct}% — ${coverageLabel}</span>
+    </div>`;
+
+    if (holidayClosed > 0 || holidayOpen > 0) {
+      html += `<div class="detail-stat-row" style="padding:6px 0;">
+        <span class="stat-label">Holidays</span>
+        <span class="stat-value" style="font-size:12px;">${holidayOpen > 0 ? `<span style="color:var(--success)">${holidayOpen} open</span>` : ''} ${holidayClosed > 0 ? `<span style="color:var(--danger)">${holidayClosed} closed</span>` : ''}</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  // List all nearby stashpoints with full details
+  if (nearbySp.length > 0) {
+    html += '<div style="margin-top:8px;">';
+    nearbySp.forEach(sp => {
+      const avgRating = sp.reviews > 0 ? (sp.rating / sp.reviews).toFixed(1) : '—';
+      const statusColor = sp.active ? '#34d399' : '#f87171';
+      const statusLabel = sp.active ? 'Active' : 'Inactive';
+      const distLabel = sp.dist < 0.1 ? Math.round(sp.dist * 1000) + 'm' : sp.dist.toFixed(2) + 'km';
+      const typeLabel = sp.type ? sp.type.replace(/_/g, ' ') : '—';
+      const features = [];
+      if (sp.open24) features.push({ label: '24/7', color: 'rgba(16,185,129,0.15)', text: '#34d399' });
+      else if (sp.openLate) features.push({ label: 'Open Late', color: 'rgba(245,158,11,0.15)', text: '#fbbf24' });
+      else features.push({ label: 'Standard', color: 'rgba(148,163,184,0.1)', text: 'var(--text-muted)' });
+      if (sp.featured) features.push({ label: 'Featured', color: 'rgba(99,102,241,0.15)', text: 'var(--accent-light)' });
+      if (sp.holidayOpen === 'closed' || sp.holidayOpen === 'closed_plus') features.push({ label: 'Holiday Closed', color: 'rgba(239,68,68,0.15)', text: '#f87171' });
+      else if (sp.holidayOpen === 'default_schedule' || sp.holidayOpen === 'open') features.push({ label: 'Holiday Open', color: 'rgba(16,185,129,0.15)', text: '#34d399' });
+
+      html += `<div style="background:var(--surface-2);border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid ${statusColor};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-weight:600;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sp.name}</span>
+          <span style="font-size:11px;color:${statusColor};font-weight:600;">${statusLabel}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">${sp.locationName || sp.address}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;">
+          <div><span style="color:var(--text-muted);">Distance:</span> <b>${distLabel}</b></div>
+          <div><span style="color:var(--text-muted);">Capacity:</span> <b>${sp.capacity} bags</b></div>
+          <div><span style="color:var(--text-muted);">Bookings:</span> <b>${sp.bookings.toLocaleString()}</b></div>
+          <div><span style="color:var(--text-muted);">Rating:</span> <b>${avgRating}&#9733;</b> (${sp.reviews})</div>
+          <div><span style="color:var(--text-muted);">Type:</span> ${typeLabel}</div>
+          <div><span style="color:var(--text-muted);">Quality:</span> ${sp.quality}/5</div>
+        </div>
+        ${features.length > 0 ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${features.map(f => `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${f.color};color:${f.text};">${f.label}</span>`).join('')}</div>` : ''}
+      </div>`;
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--danger);padding:8px 0;">No StashPoints within 500m — supply gap!</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+// ─── Sync status ───
+let lastSyncTime = null;
+
+function updateSyncStatus(syncing) {
+  const dot = document.getElementById('syncDot');
+  const text = document.getElementById('syncText');
+  if (syncing) {
+    dot.style.background = 'var(--warning)';
+    text.textContent = 'Syncing…';
+    return;
+  }
+  lastSyncTime = new Date();
+  dot.style.background = 'var(--success)';
+  text.textContent = `Synced ${lastSyncTime.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
+}
+
+// Patch loadData to update sync indicator
+const _originalLoadData = loadData;
+loadData = async function() {
+  updateSyncStatus(true);
+  await _originalLoadData();
+  updateSyncStatus(false);
+};
+
+// Auto-refresh every 7 days (604800000 ms)
+const SYNC_INTERVAL = 7 * 24 * 60 * 60 * 1000;
+setInterval(() => { loadData(); }, SYNC_INTERVAL);
+
+// Update relative time display every minute
+setInterval(() => {
+  if (!lastSyncTime) return;
+  const diff = Date.now() - lastSyncTime.getTime();
+  const text = document.getElementById('syncText');
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 1) text.textContent = 'Synced just now';
+  else if (mins < 60) text.textContent = `Synced ${mins}m ago`;
+  else if (hours < 24) text.textContent = `Synced ${hours}h ago`;
+  else text.textContent = `Synced ${days}d ago`;
+}, 60000);
+
+// ─── Init ───
+updateSeoButtonState();
+loadData();
+</script>
+</body>
+</html>
