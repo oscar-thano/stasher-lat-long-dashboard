@@ -519,6 +519,9 @@
     .serp-top30 { background: rgba(245,158,11,0.15); color: #fbbf24; }
     .serp-low { background: rgba(239,68,68,0.15); color: #f87171; }
     .serp-nr { background: rgba(148,163,184,0.1); color: var(--text-muted); }
+    .page-type-city { display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700; background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .page-type-area { display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700; background: rgba(6,182,212,0.15); color: #06b6d4; }
+    .page-type-other { display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700; background: rgba(148,163,184,0.1); color: var(--text-muted); }
 
     /* SEO detail section */
     .seo-section {
@@ -794,6 +797,7 @@
   <button class="tab-btn" data-tab="performing">Performing Well</button>
   <button class="tab-btn" data-tab="underperforming">Underperforming</button>
   <button class="tab-btn" data-tab="seo">SEO Intelligence</button>
+  <button class="tab-btn" data-tab="organic">Organic Presence</button>
 </div>
 
 <div class="layout map-active">
@@ -847,6 +851,35 @@
             <table>
               <thead id="seoTableHead"></thead>
               <tbody id="seoTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Organic Presence -->
+    <div class="tab-content" id="tab-organic">
+      <div class="kpi-strip" id="organicKpiStrip"></div>
+      <div class="content-area">
+        <div class="table-section">
+          <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            Organic Presence — stasher.com
+            <button class="seo-fetch-btn" id="organicFetchBtn">Fetch Domain Data</button>
+            <span id="organicFetchProgress" style="font-size:11px;color:var(--text-muted);font-weight:400;"></span>
+            <span style="flex:1"></span>
+            <select id="organicCountryFilter" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
+              <option value="all">All Countries</option>
+            </select>
+            <select id="organicPageFilter" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
+              <option value="all">All Pages</option>
+              <option value="city">City Pages Only</option>
+              <option value="area">Area Pages Only</option>
+            </select>
+          </h2>
+          <div class="table-scroll" id="organicTableScroll">
+            <table>
+              <thead id="organicTableHead"></thead>
+              <tbody id="organicTableBody"></tbody>
             </table>
           </div>
         </div>
@@ -1557,6 +1590,10 @@ window.addEventListener('resize', () => { renderScatter(); });
 
 // ─── DataForSEO Integration ───
 const seoCache = new Map(); // key: city name, value: { volume, rank, keywords, competitors, timestamp }
+const organicRankedKeywords = []; // domain-level ranked keywords from DataForSEO
+let organicDataTimestamp = null;
+let organicSortCol = 'searchVolume';
+let organicSortDir = 'desc';
 
 const COUNTRY_LOCATION_MAP = {
   'United Kingdom': { code: 2826, lang: 'English' },
@@ -1970,6 +2007,240 @@ function getSerpBadgeHtml(rank) {
   return `<span class="serp-badge serp-low">#${rank}</span>`;
 }
 
+// ─── Organic Presence: URL Classifier ───
+function classifyStasherUrl(url) {
+  if (!url) return 'unknown';
+  try {
+    const path = new URL(url).pathname.replace(/\/$/, '');
+    const segments = path.split('/').filter(Boolean);
+    if (segments[0] !== 'luggage-storage' || segments.length < 3) return 'other';
+    if (segments.length === 3) return 'city';
+    if (segments.length >= 4) return 'area';
+    return 'other';
+  } catch { return 'unknown'; }
+}
+
+function extractPageName(url) {
+  if (!url) return '';
+  try {
+    const path = new URL(url).pathname.replace(/\/$/, '');
+    const segments = path.split('/').filter(Boolean);
+    if (segments.length >= 4) return segments.slice(1).join(' / ').replace(/-/g, ' ');
+    if (segments.length === 3) return segments.slice(1).join(' / ').replace(/-/g, ' ');
+    return path;
+  } catch { return url; }
+}
+
+// ─── Organic Presence: Domain-Level API Fetch ───
+const ORGANIC_KEY_MARKETS = [
+  { code: 2826, lang: 'English', name: 'United Kingdom' },
+  { code: 2840, lang: 'English', name: 'United States' },
+  { code: 2250, lang: 'French', name: 'France' },
+  { code: 2276, lang: 'German', name: 'Germany' },
+  { code: 2724, lang: 'Spanish', name: 'Spain' },
+  { code: 2380, lang: 'Italian', name: 'Italy' },
+  { code: 2528, lang: 'Dutch', name: 'Netherlands' },
+  { code: 2036, lang: 'English', name: 'Australia' },
+  { code: 2372, lang: 'English', name: 'Ireland' },
+  { code: 2620, lang: 'Portuguese', name: 'Portugal' },
+];
+
+async function fetchDomainRankedKeywords() {
+  const creds = getDfsCredentials();
+  if (!creds) return;
+  const progress = document.getElementById('organicFetchProgress');
+  organicRankedKeywords.length = 0;
+
+  for (let i = 0; i < ORGANIC_KEY_MARKETS.length; i++) {
+    const market = ORGANIC_KEY_MARKETS[i];
+    if (progress) progress.textContent = `Fetching ${market.name} (${i + 1}/${ORGANIC_KEY_MARKETS.length})…`;
+    try {
+      const resp = await fetch('https://api.dataforseo.com/v3/dataforseo_labs/google/ranked_keywords/live', {
+        method: 'POST',
+        headers: { 'Authorization': creds.auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify([{
+          target: 'stasher.com',
+          location_code: market.code,
+          language_name: market.lang,
+          limit: 700,
+          order_by: ['keyword_data.keyword_info.search_volume,desc'],
+          filters: ['ranked_serp_element.serp_item.is_paid', '=', false],
+        }]),
+      });
+      const json = await resp.json();
+      const items = json?.tasks?.[0]?.result?.[0]?.items || [];
+      items.forEach(item => {
+        const kw = item.keyword_data?.keyword;
+        const vol = item.keyword_data?.keyword_info?.search_volume || 0;
+        const cpc = item.keyword_data?.keyword_info?.cpc || 0;
+        const comp = item.keyword_data?.keyword_info?.competition_level || '—';
+        const serpItem = item.ranked_serp_element?.serp_item;
+        if (!serpItem || !kw) return;
+        const url = serpItem.url || '';
+        const position = serpItem.rank_absolute || serpItem.rank_group || null;
+        organicRankedKeywords.push({
+          keyword: kw,
+          position,
+          searchVolume: vol,
+          cpc,
+          competition: comp,
+          url,
+          pageType: classifyStasherUrl(url),
+          pageName: extractPageName(url),
+          country: market.name,
+          source: 'domain',
+        });
+      });
+    } catch (err) {
+      console.error(`Organic fetch error for ${market.name}:`, err);
+    }
+    if (i < ORGANIC_KEY_MARKETS.length - 1) await new Promise(r => setTimeout(r, 500));
+  }
+  organicDataTimestamp = Date.now();
+  if (progress) progress.textContent = `Done — ${organicRankedKeywords.length} keywords found`;
+}
+
+// ─── Organic Presence: Cache Aggregation ───
+function aggregateCacheOrganicData() {
+  const entries = [];
+  seoCache.forEach((data, key) => {
+    if (!data.stasherUrl || data.rank == null) return;
+    const parts = key.split('|');
+    entries.push({
+      keyword: data.serpKeyword || '',
+      position: data.rank,
+      searchVolume: data.volume || 0,
+      cpc: 0,
+      competition: '—',
+      url: data.stasherUrl,
+      pageType: classifyStasherUrl(data.stasherUrl),
+      pageName: extractPageName(data.stasherUrl),
+      country: parts[2] || '',
+      source: 'cache',
+    });
+  });
+  return entries;
+}
+
+// ─── Organic Presence: Render Tab ───
+function renderOrganicTab() {
+  // Merge domain + cache data, dedup on keyword+url
+  const domainData = [...organicRankedKeywords];
+  const cacheData = aggregateCacheOrganicData();
+  const seen = new Set();
+  const merged = [];
+  // Domain data takes priority
+  domainData.forEach(d => {
+    const key = (d.keyword || '').toLowerCase() + '|' + (d.url || '');
+    if (!seen.has(key)) { seen.add(key); merged.push(d); }
+  });
+  cacheData.forEach(d => {
+    const key = (d.keyword || '').toLowerCase() + '|' + (d.url || '');
+    if (!seen.has(key)) { seen.add(key); merged.push(d); }
+  });
+
+  // Apply filters
+  const pageFilter = document.getElementById('organicPageFilter')?.value || 'all';
+  const countryFilter = document.getElementById('organicCountryFilter')?.value || 'all';
+  let filtered = merged;
+  if (pageFilter !== 'all') filtered = filtered.filter(d => d.pageType === pageFilter);
+  if (countryFilter !== 'all') filtered = filtered.filter(d => d.country === countryFilter);
+
+  // Populate country filter dropdown
+  const countrySelect = document.getElementById('organicCountryFilter');
+  if (countrySelect) {
+    const countries = [...new Set(merged.map(d => d.country).filter(Boolean))].sort();
+    const currentVal = countrySelect.value;
+    countrySelect.innerHTML = '<option value="all">All Countries</option>' +
+      countries.map(c => `<option value="${c}" ${c === currentVal ? 'selected' : ''}>${c}</option>`).join('');
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    let va = a[organicSortCol], vb = b[organicSortCol];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return organicSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return organicSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // KPIs
+  const allForKpi = merged; // use unfiltered for KPIs
+  const totalRankings = allForKpi.length;
+  const positions = allForKpi.filter(d => d.position != null).map(d => d.position);
+  const avgPos = positions.length > 0 ? (positions.reduce((a, b) => a + b, 0) / positions.length).toFixed(1) : '—';
+  const cityCount = allForKpi.filter(d => d.pageType === 'city').length;
+  const areaCount = allForKpi.filter(d => d.pageType === 'area').length;
+  const top10 = allForKpi.filter(d => d.position != null && d.position <= 10).length;
+  const notRanking = allForKpi.filter(d => d.position != null && d.position > 50).length;
+
+  const kpiStrip = document.getElementById('organicKpiStrip');
+  if (kpiStrip) {
+    kpiStrip.innerHTML = `
+      <div class="kpi-card"><div class="kpi-value">${totalRankings.toLocaleString()}</div><div class="kpi-label">Total Rankings</div><div class="kpi-sub">keywords tracked</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:${parseFloat(avgPos) <= 20 ? 'var(--success)' : 'var(--warning)'};">${avgPos}</div><div class="kpi-label">Avg Position</div><div class="kpi-sub">${positions.length} keywords ranking</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--warning);">${cityCount}</div><div class="kpi-label">City Pages</div><div class="kpi-sub">ranking keywords</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--cyan);">${areaCount}</div><div class="kpi-label">Area Pages</div><div class="kpi-sub">ranking keywords</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--success);">${top10}</div><div class="kpi-label">Top 10</div><div class="kpi-sub">1st page keywords</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--danger);">${notRanking}</div><div class="kpi-label">Position 50+</div><div class="kpi-sub">low visibility</div></div>
+    `;
+  }
+
+  // Table header
+  const thead = document.getElementById('organicTableHead');
+  const cols = [
+    { key: 'pageName', label: 'Page' },
+    { key: 'keyword', label: 'Keyword' },
+    { key: 'position', label: 'Position' },
+    { key: 'searchVolume', label: 'Volume' },
+    { key: 'pageType', label: 'Type' },
+    { key: 'country', label: 'Country' },
+  ];
+  if (thead) {
+    thead.innerHTML = '<tr>' + cols.map(c => {
+      const arrow = organicSortCol === c.key ? (organicSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      return `<th class="sortable" data-col="${c.key}" style="cursor:pointer;">${c.label}${arrow}</th>`;
+    }).join('') + '</tr>';
+    thead.querySelectorAll('.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (organicSortCol === col) organicSortDir = organicSortDir === 'asc' ? 'desc' : 'asc';
+        else { organicSortCol = col; organicSortDir = col === 'keyword' || col === 'pageName' || col === 'country' ? 'asc' : 'desc'; }
+        renderOrganicTab();
+      });
+    });
+  }
+
+  // Table body
+  const tbody = document.getElementById('organicTableBody');
+  if (tbody) {
+    const rows = filtered.slice(0, 500);
+    tbody.innerHTML = rows.map(d => {
+      const volStr = d.searchVolume >= 1000 ? (d.searchVolume / 1000).toFixed(1) + 'k' : (d.searchVolume || 0);
+      const typeClass = d.pageType === 'city' ? 'page-type-city' : d.pageType === 'area' ? 'page-type-area' : 'page-type-other';
+      const typeLabel = d.pageType === 'city' ? 'City' : d.pageType === 'area' ? 'Area' : d.pageType || '—';
+      const pathDisplay = d.pageName || '—';
+      return `<tr>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="${d.url}" target="_blank" style="color:var(--accent-light);text-decoration:none;font-weight:500;" title="${d.url}">${pathDisplay}</a></td>
+        <td style="color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${d.keyword}">${d.keyword}</td>
+        <td>${getSerpBadgeHtml(d.position)}</td>
+        <td style="font-weight:600;">${volStr}</td>
+        <td><span class="${typeClass}">${typeLabel}</span></td>
+        <td style="color:var(--text-muted);">${d.country || '—'}</td>
+      </tr>`;
+    }).join('');
+
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">
+        ${organicRankedKeywords.length === 0 && seoCache.size === 0
+          ? 'No data yet — click <b>Fetch Domain Data</b> to pull stasher.com rankings, or fetch SEO data on individual locations first.'
+          : 'No results match the current filters.'}
+      </td></tr>`;
+    }
+  }
+}
+
 function renderSeoKeywordTable(keywords) {
   if (!keywords || keywords.length === 0) return '';
   let html = `<table class="seo-kw-table">
@@ -2153,6 +2424,8 @@ function switchTab(tabName) {
     renderSeoTab();
   } else if (tabName === 'map') {
     setTimeout(() => renderMapTab(), 50);
+  } else if (tabName === 'organic') {
+    renderOrganicTab();
   }
 }
 
@@ -2502,6 +2775,20 @@ document.getElementById('seoFetchBtn').addEventListener('click', async function(
   renderSeoTab();
   setTimeout(() => { progress.textContent = ''; }, 3000);
 });
+
+// ─── Organic Presence Tab: Event Listeners ───
+document.getElementById('organicFetchBtn').addEventListener('click', async function() {
+  const btn = this;
+  btn.disabled = true;
+  btn.textContent = 'Fetching…';
+  await fetchDomainRankedKeywords();
+  btn.disabled = false;
+  btn.textContent = 'Fetch Domain Data';
+  renderOrganicTab();
+});
+
+document.getElementById('organicPageFilter').addEventListener('change', () => renderOrganicTab());
+document.getElementById('organicCountryFilter').addEventListener('change', () => renderOrganicTab());
 
 // ─── Map Tab ───
 // Cluster POIs within a given radius (km) using greedy clustering
