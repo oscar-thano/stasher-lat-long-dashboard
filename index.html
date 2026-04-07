@@ -2077,6 +2077,9 @@ async function fetchDomainRankedKeywords() {
         const serpItem = item.ranked_serp_element?.serp_item;
         if (!serpItem || !kw) return;
         const url = serpItem.url || '';
+        // Only include /luggage-storage/ commercial pages
+        const pageType = classifyStasherUrl(url);
+        if (pageType !== 'city' && pageType !== 'area') return;
         const position = serpItem.rank_absolute || serpItem.rank_group || null;
         organicRankedKeywords.push({
           keyword: kw,
@@ -2085,7 +2088,7 @@ async function fetchDomainRankedKeywords() {
           cpc,
           competition: comp,
           url,
-          pageType: classifyStasherUrl(url),
+          pageType,
           pageName: extractPageName(url),
           country: market.name,
           source: 'domain',
@@ -2100,56 +2103,144 @@ async function fetchDomainRankedKeywords() {
   if (progress) progress.textContent = `Done — ${organicRankedKeywords.length} keywords found`;
 }
 
-// ─── Organic Presence: Cache Aggregation ───
-function aggregateCacheOrganicData() {
-  const entries = [];
-  seoCache.forEach((data, key) => {
-    if (!data.stasherUrl || data.rank == null) return;
-    const parts = key.split('|');
-    entries.push({
-      keyword: data.serpKeyword || '',
-      position: data.rank,
-      searchVolume: data.volume || 0,
-      cpc: 0,
-      competition: '—',
-      url: data.stasherUrl,
-      pageType: classifyStasherUrl(data.stasherUrl),
-      pageName: extractPageName(data.stasherUrl),
-      country: parts[2] || '',
-      source: 'cache',
-    });
+// ─── Organic Presence: Build city/area view from cache + domain data ───
+function buildOrganicCityView() {
+  // Group by city — merge demand data with SEO ranking data
+  const cityMap = new Map(); // key: city name, value: { city, country, demand, keywords, pageType, url, ... }
+
+  // 1. Start from POI demand data — every city we track
+  const cityDemand = new Map();
+  (allData || []).forEach(d => {
+    if (!d.city) return;
+    const key = d.city + '|' + d.country;
+    if (!cityDemand.has(key)) {
+      cityDemand.set(key, { city: d.city, country: d.country, totalSearches: 0, totalConversions: 0, locationCount: 0 });
+    }
+    const cd = cityDemand.get(key);
+    cd.totalSearches += d.searches || 0;
+    cd.totalConversions += d.conversions || 0;
+    cd.locationCount++;
   });
-  return entries;
+
+  // 2. Pull SEO cache data (per-location SERP results for luggage storage keywords)
+  seoCache.forEach((data, key) => {
+    const parts = key.split('|');
+    const locationName = parts[0] || '';
+    const city = parts[1] || '';
+    const country = parts[2] || '';
+    if (!city) return;
+
+    const cityKey = city + '|' + country;
+    const demand = cityDemand.get(cityKey);
+
+    // Add city-level entry if we have a stasher ranking
+    if (data.rank != null && data.stasherUrl) {
+      const pageType = classifyStasherUrl(data.stasherUrl);
+      if (pageType === 'city' || pageType === 'area') {
+        const entryKey = (data.stasherUrl || '') + '|' + (data.serpKeyword || '');
+        if (!cityMap.has(entryKey)) {
+          cityMap.set(entryKey, {
+            city,
+            country,
+            location: locationName || city,
+            url: data.stasherUrl,
+            pageType,
+            pageName: extractPageName(data.stasherUrl),
+            serpKeyword: data.serpKeyword || '',
+            position: data.rank,
+            seoVolume: data.volume || 0,
+            demand: demand ? demand.totalSearches : 0,
+            demandCvr: demand && demand.totalSearches > 0 ? (demand.totalConversions / demand.totalSearches * 100).toFixed(1) : '—',
+            source: 'cache',
+          });
+        }
+      }
+    }
+
+    // Also add individual keyword entries from the cache
+    if (data.keywords && data.keywords.length > 0) {
+      data.keywords.forEach(kw => {
+        if (!kw.keyword || kw.volume < 10) return;
+        const kwUrl = data.stasherUrl || '';
+        const pageType = classifyStasherUrl(kwUrl);
+        if (pageType !== 'city' && pageType !== 'area') return;
+        const entryKey = kwUrl + '|' + kw.keyword;
+        if (!cityMap.has(entryKey)) {
+          cityMap.set(entryKey, {
+            city,
+            country,
+            location: locationName || city,
+            url: kwUrl,
+            pageType,
+            pageName: extractPageName(kwUrl),
+            serpKeyword: kw.keyword,
+            position: data.rank,
+            seoVolume: kw.volume,
+            demand: demand ? demand.totalSearches : 0,
+            demandCvr: demand && demand.totalSearches > 0 ? (demand.totalConversions / demand.totalSearches * 100).toFixed(1) : '—',
+            source: 'cache',
+          });
+        }
+      });
+    }
+  });
+
+  // 3. Merge in domain-level API data (commercial pages only)
+  organicRankedKeywords.forEach(d => {
+    const entryKey = (d.url || '') + '|' + (d.keyword || '');
+    if (cityMap.has(entryKey)) {
+      // Domain data enriches existing entry
+      const existing = cityMap.get(entryKey);
+      existing.seoVolume = d.searchVolume || existing.seoVolume;
+      existing.position = d.position || existing.position;
+      existing.source = 'both';
+    } else {
+      // Try to match city from URL path
+      const pageName = extractPageName(d.url);
+      const urlCity = pageName.split(' / ').pop() || '';
+      // Find demand data for this city
+      let demand = 0, demandCvr = '—';
+      cityDemand.forEach((cd, key) => {
+        if (cd.city.toLowerCase() === urlCity.toLowerCase()) {
+          demand = cd.totalSearches;
+          demandCvr = cd.totalSearches > 0 ? (cd.totalConversions / cd.totalSearches * 100).toFixed(1) : '—';
+        }
+      });
+      cityMap.set(entryKey, {
+        city: urlCity,
+        country: d.country,
+        location: urlCity,
+        url: d.url,
+        pageType: d.pageType,
+        pageName: d.pageName,
+        serpKeyword: d.keyword,
+        position: d.position,
+        seoVolume: d.searchVolume,
+        demand,
+        demandCvr,
+        source: 'domain',
+      });
+    }
+  });
+
+  return [...cityMap.values()];
 }
 
 // ─── Organic Presence: Render Tab ───
 function renderOrganicTab() {
-  // Merge domain + cache data, dedup on keyword+url
-  const domainData = [...organicRankedKeywords];
-  const cacheData = aggregateCacheOrganicData();
-  const seen = new Set();
-  const merged = [];
-  // Domain data takes priority
-  domainData.forEach(d => {
-    const key = (d.keyword || '').toLowerCase() + '|' + (d.url || '');
-    if (!seen.has(key)) { seen.add(key); merged.push(d); }
-  });
-  cacheData.forEach(d => {
-    const key = (d.keyword || '').toLowerCase() + '|' + (d.url || '');
-    if (!seen.has(key)) { seen.add(key); merged.push(d); }
-  });
+  const allEntries = buildOrganicCityView();
 
   // Apply filters
   const pageFilter = document.getElementById('organicPageFilter')?.value || 'all';
   const countryFilter = document.getElementById('organicCountryFilter')?.value || 'all';
-  let filtered = merged;
+  let filtered = allEntries;
   if (pageFilter !== 'all') filtered = filtered.filter(d => d.pageType === pageFilter);
   if (countryFilter !== 'all') filtered = filtered.filter(d => d.country === countryFilter);
 
   // Populate country filter dropdown
   const countrySelect = document.getElementById('organicCountryFilter');
   if (countrySelect) {
-    const countries = [...new Set(merged.map(d => d.country).filter(Boolean))].sort();
+    const countries = [...new Set(allEntries.map(d => d.country).filter(Boolean))].sort();
     const currentVal = countrySelect.value;
     countrySelect.innerHTML = '<option value="all">All Countries</option>' +
       countries.map(c => `<option value="${c}" ${c === currentVal ? 'selected' : ''}>${c}</option>`).join('');
@@ -2158,30 +2249,31 @@ function renderOrganicTab() {
   // Sort
   filtered.sort((a, b) => {
     let va = a[organicSortCol], vb = b[organicSortCol];
-    if (typeof va === 'string') va = va.toLowerCase();
-    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (typeof va === 'string') va = (va || '').toLowerCase();
+    if (typeof vb === 'string') vb = (vb || '').toLowerCase();
+    if (va == null) va = 0; if (vb == null) vb = 0;
     if (va < vb) return organicSortDir === 'asc' ? -1 : 1;
     if (va > vb) return organicSortDir === 'asc' ? 1 : -1;
     return 0;
   });
 
-  // KPIs
-  const allForKpi = merged; // use unfiltered for KPIs
-  const totalRankings = allForKpi.length;
-  const positions = allForKpi.filter(d => d.position != null).map(d => d.position);
+  // KPIs (use all entries, unfiltered)
+  const totalKeywords = allEntries.length;
+  const uniquePages = new Set(allEntries.map(d => d.url)).size;
+  const positions = allEntries.filter(d => d.position != null).map(d => d.position);
   const avgPos = positions.length > 0 ? (positions.reduce((a, b) => a + b, 0) / positions.length).toFixed(1) : '—';
-  const cityCount = allForKpi.filter(d => d.pageType === 'city').length;
-  const areaCount = allForKpi.filter(d => d.pageType === 'area').length;
-  const top10 = allForKpi.filter(d => d.position != null && d.position <= 10).length;
-  const notRanking = allForKpi.filter(d => d.position != null && d.position > 50).length;
+  const cityPages = new Set(allEntries.filter(d => d.pageType === 'city').map(d => d.url)).size;
+  const areaPages = new Set(allEntries.filter(d => d.pageType === 'area').map(d => d.url)).size;
+  const top10 = allEntries.filter(d => d.position != null && d.position <= 10).length;
+  const notRanking = allEntries.filter(d => d.position != null && d.position > 50).length;
 
   const kpiStrip = document.getElementById('organicKpiStrip');
   if (kpiStrip) {
     kpiStrip.innerHTML = `
-      <div class="kpi-card"><div class="kpi-value">${totalRankings.toLocaleString()}</div><div class="kpi-label">Total Rankings</div><div class="kpi-sub">keywords tracked</div></div>
-      <div class="kpi-card"><div class="kpi-value" style="color:${parseFloat(avgPos) <= 20 ? 'var(--success)' : 'var(--warning)'};">${avgPos}</div><div class="kpi-label">Avg Position</div><div class="kpi-sub">${positions.length} keywords ranking</div></div>
-      <div class="kpi-card"><div class="kpi-value" style="color:var(--warning);">${cityCount}</div><div class="kpi-label">City Pages</div><div class="kpi-sub">ranking keywords</div></div>
-      <div class="kpi-card"><div class="kpi-value" style="color:var(--cyan);">${areaCount}</div><div class="kpi-label">Area Pages</div><div class="kpi-sub">ranking keywords</div></div>
+      <div class="kpi-card"><div class="kpi-value">${uniquePages}</div><div class="kpi-label">Ranking Pages</div><div class="kpi-sub">${totalKeywords} keywords</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:${parseFloat(avgPos) <= 20 ? 'var(--success)' : 'var(--warning)'};">${avgPos}</div><div class="kpi-label">Avg Position</div><div class="kpi-sub">${positions.length} keywords</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--warning);">${cityPages}</div><div class="kpi-label">City Pages</div><div class="kpi-sub">unique URLs ranking</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--cyan);">${areaPages}</div><div class="kpi-label">Area Pages</div><div class="kpi-sub">unique URLs ranking</div></div>
       <div class="kpi-card"><div class="kpi-value" style="color:var(--success);">${top10}</div><div class="kpi-label">Top 10</div><div class="kpi-sub">1st page keywords</div></div>
       <div class="kpi-card"><div class="kpi-value" style="color:var(--danger);">${notRanking}</div><div class="kpi-label">Position 50+</div><div class="kpi-sub">low visibility</div></div>
     `;
@@ -2191,9 +2283,10 @@ function renderOrganicTab() {
   const thead = document.getElementById('organicTableHead');
   const cols = [
     { key: 'pageName', label: 'Page' },
-    { key: 'keyword', label: 'Keyword' },
-    { key: 'position', label: 'Position' },
-    { key: 'searchVolume', label: 'Volume' },
+    { key: 'serpKeyword', label: 'Keyword' },
+    { key: 'position', label: 'SERP Rank' },
+    { key: 'seoVolume', label: 'Keyword Vol.' },
+    { key: 'demand', label: 'Demand (500m)' },
     { key: 'pageType', label: 'Type' },
     { key: 'country', label: 'Country' },
   ];
@@ -2206,7 +2299,7 @@ function renderOrganicTab() {
       th.addEventListener('click', () => {
         const col = th.dataset.col;
         if (organicSortCol === col) organicSortDir = organicSortDir === 'asc' ? 'desc' : 'asc';
-        else { organicSortCol = col; organicSortDir = col === 'keyword' || col === 'pageName' || col === 'country' ? 'asc' : 'desc'; }
+        else { organicSortCol = col; organicSortDir = col === 'serpKeyword' || col === 'pageName' || col === 'country' ? 'asc' : 'desc'; }
         renderOrganicTab();
       });
     });
@@ -2217,22 +2310,23 @@ function renderOrganicTab() {
   if (tbody) {
     const rows = filtered.slice(0, 500);
     tbody.innerHTML = rows.map(d => {
-      const volStr = d.searchVolume >= 1000 ? (d.searchVolume / 1000).toFixed(1) + 'k' : (d.searchVolume || 0);
-      const typeClass = d.pageType === 'city' ? 'page-type-city' : d.pageType === 'area' ? 'page-type-area' : 'page-type-other';
-      const typeLabel = d.pageType === 'city' ? 'City' : d.pageType === 'area' ? 'Area' : d.pageType || '—';
-      const pathDisplay = d.pageName || '—';
+      const volStr = d.seoVolume >= 1000 ? (d.seoVolume / 1000).toFixed(1) + 'k' : (d.seoVolume || 0);
+      const demandStr = d.demand >= 1000 ? (d.demand / 1000).toFixed(1) + 'k' : (d.demand || '—');
+      const typeClass = d.pageType === 'city' ? 'page-type-city' : 'page-type-area';
+      const typeLabel = d.pageType === 'city' ? 'City' : 'Area';
       return `<tr>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="${d.url}" target="_blank" style="color:var(--accent-light);text-decoration:none;font-weight:500;" title="${d.url}">${pathDisplay}</a></td>
-        <td style="color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${d.keyword}">${d.keyword}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a href="${d.url}" target="_blank" style="color:var(--accent-light);text-decoration:none;font-weight:500;" title="${d.url}">${d.pageName || '—'}</a></td>
+        <td style="color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${d.serpKeyword}">${d.serpKeyword}</td>
         <td>${getSerpBadgeHtml(d.position)}</td>
         <td style="font-weight:600;">${volStr}</td>
+        <td style="color:var(--cyan);">${demandStr}</td>
         <td><span class="${typeClass}">${typeLabel}</span></td>
         <td style="color:var(--text-muted);">${d.country || '—'}</td>
       </tr>`;
     }).join('');
 
     if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted);">
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted);">
         ${organicRankedKeywords.length === 0 && seoCache.size === 0
           ? 'No data yet — click <b>Fetch Domain Data</b> to pull stasher.com rankings, or fetch SEO data on individual locations first.'
           : 'No results match the current filters.'}
