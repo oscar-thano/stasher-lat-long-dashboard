@@ -938,16 +938,42 @@ let sortCol = 'opportunity_score';
 let sortDir = 'desc';
 
 // ─── Data loading ───
+const bookingStatsMap = new Map(); // stashpoint_id → booking stats
+
 async function loadData() {
   try {
-    const [poiResp, spResp] = await Promise.all([
+    const [poiResp, spResp, bkResp] = await Promise.all([
       fetch(CSV_URL),
       fetch(SP_CSV_URL),
+      fetch('booking_stats.csv').catch(() => null),
     ]);
     const poiText = await poiResp.text();
     const spText = await spResp.text();
     const poiParsed = Papa.parse(poiText, { header: true, skipEmptyLines: true });
     const spParsed = Papa.parse(spText, { header: true, skipEmptyLines: true });
+
+    // Load booking stats
+    if (bkResp && bkResp.ok) {
+      const bkText = await bkResp.text();
+      const bkParsed = Papa.parse(bkText, { header: true, skipEmptyLines: true });
+      bookingStatsMap.clear();
+      bkParsed.data.forEach(r => {
+        if (!r.stashpoint_id) return;
+        bookingStatsMap.set(r.stashpoint_id, {
+          paidBookings: parseInt(r.paid_bookings) || 0,
+          totalRevenue: parseFloat(r.total_revenue_gbp) || 0,
+          netRevenue: parseFloat(r.net_revenue_gbp) || 0,
+          bookings30d: parseInt(r.bookings_30d) || 0,
+          revenue30d: parseFloat(r.revenue_30d_gbp) || 0,
+          bookings90d: parseInt(r.bookings_90d) || 0,
+          revenue90d: parseFloat(r.revenue_90d_gbp) || 0,
+          avgBags: parseFloat(r.avg_bags) || 0,
+          cancelled: parseInt(r.cancelled) || 0,
+        });
+      });
+      console.log(`Loaded booking stats for ${bookingStatsMap.size} stashpoints`);
+    }
+
     processStashpoints(spParsed.data);
     processData(poiParsed.data);
   } catch(e) {
@@ -3098,6 +3124,28 @@ function renderSupplyDetail(d) {
     <span class="stat-value">${totalBookings.toLocaleString()}</span>
   </div>`;
 
+  // Aggregate booking stats from DB
+  const aggBk = { paid: 0, rev: 0, bk30d: 0, rev30d: 0, bk90d: 0 };
+  activeSp.forEach(sp => {
+    const bk = bookingStatsMap.get(sp.id);
+    if (!bk) return;
+    aggBk.paid += bk.paidBookings;
+    aggBk.rev += bk.totalRevenue;
+    aggBk.bk30d += bk.bookings30d;
+    aggBk.rev30d += bk.revenue30d;
+    aggBk.bk90d += bk.bookings90d;
+  });
+  const fmtG = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
+  if (aggBk.paid > 0) {
+    html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--success);margin-bottom:6px;">Booking Performance (DB)</div>
+      <div class="detail-stat-row"><span class="stat-label">Paid Bookings (all-time)</span><span class="stat-value">${aggBk.paid.toLocaleString()}</span></div>
+      <div class="detail-stat-row"><span class="stat-label">Total Revenue</span><span class="stat-value" style="color:var(--success);">${fmtG(aggBk.rev)}</span></div>
+      <div class="detail-stat-row"><span class="stat-label">Last 30 days</span><span class="stat-value">${aggBk.bk30d} bkgs · <span style="color:var(--cyan);">${fmtG(aggBk.rev30d)}</span></span></div>
+      <div class="detail-stat-row"><span class="stat-label">Last 90 days</span><span class="stat-value">${aggBk.bk90d} bkgs</span></div>
+    </div>`;
+  }
+
   if (nearbySp.filter(sp => !sp.active).length > 0) {
     html += `<div class="detail-stat-row">
       <span class="stat-label">Inactive StashPoints</span>
@@ -3156,6 +3204,17 @@ function renderSupplyDetail(d) {
       if (sp.holidayOpen === 'closed' || sp.holidayOpen === 'closed_plus') features.push({ label: 'Holiday Closed', color: 'rgba(239,68,68,0.15)', text: '#f87171' });
       else if (sp.holidayOpen === 'default_schedule' || sp.holidayOpen === 'open') features.push({ label: 'Holiday Open', color: 'rgba(16,185,129,0.15)', text: '#34d399' });
 
+      // Booking stats from DB
+      const bkStats = bookingStatsMap.get(sp.id);
+      const bk30d = bkStats ? bkStats.bookings30d : 0;
+      const rev30d = bkStats ? bkStats.revenue30d : 0;
+      const bk90d = bkStats ? bkStats.bookings90d : 0;
+      const revTotal = bkStats ? bkStats.totalRevenue : 0;
+      const avgBags = bkStats ? bkStats.avgBags : 0;
+      const paidTotal = bkStats ? bkStats.paidBookings : 0;
+
+      const fmtGbp = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
+
       html += `<div style="background:var(--surface-2);border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid ${statusColor};">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
           <span style="font-weight:600;font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${sp.name}</span>
@@ -3165,11 +3224,19 @@ function renderSupplyDetail(d) {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;">
           <div><span style="color:var(--text-muted);">Distance:</span> <b>${distLabel}</b></div>
           <div><span style="color:var(--text-muted);">Capacity:</span> <b>${sp.capacity} bags</b></div>
-          <div><span style="color:var(--text-muted);">Bookings:</span> <b>${sp.bookings.toLocaleString()}</b></div>
           <div><span style="color:var(--text-muted);">Rating:</span> <b>${avgRating}&#9733;</b> (${sp.reviews})</div>
           <div><span style="color:var(--text-muted);">Type:</span> ${typeLabel}</div>
           <div><span style="color:var(--text-muted);">Quality:</span> ${sp.quality}/5</div>
+          <div><span style="color:var(--text-muted);">Avg bags:</span> <b>${avgBags}</b></div>
         </div>
+        ${bkStats ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;">
+          <div><span style="color:var(--text-muted);">All-time:</span> <b>${paidTotal.toLocaleString()}</b> <span style="color:var(--text-muted);">bkgs</span></div>
+          <div><span style="color:var(--text-muted);">Revenue:</span> <b style="color:var(--success);">${fmtGbp(revTotal)}</b></div>
+          <div><span style="color:var(--text-muted);">Last 30d:</span> <b>${bk30d}</b> <span style="color:var(--text-muted);">bkgs</span></div>
+          <div><span style="color:var(--text-muted);">Rev 30d:</span> <b style="color:var(--cyan);">${fmtGbp(rev30d)}</b></div>
+          <div><span style="color:var(--text-muted);">Last 90d:</span> <b>${bk90d}</b> <span style="color:var(--text-muted);">bkgs</span></div>
+          <div></div>
+        </div>` : ''}
         ${features.length > 0 ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${features.map(f => `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${f.color};color:${f.text};">${f.label}</span>`).join('')}</div>` : ''}
       </div>`;
     });
