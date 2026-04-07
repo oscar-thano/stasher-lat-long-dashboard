@@ -2969,6 +2969,7 @@ function renderMapTab() {
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
           <div style="color:#38bdf8;">Active StashPoints: <b>${activeSp.length}</b></div>
           <div style="color:#38bdf8;">Total capacity: <b>${totalCap} bags</b></div>
+          ${(() => { let bk30 = 0, rev30 = 0, paidAll = 0, revAll = 0; activeSp.forEach(sp => { const bk = bookingStatsMap.get(sp.id); if(bk){bk30+=bk.bookings30d;rev30+=bk.revenue30d;paidAll+=bk.paidBookings;revAll+=bk.totalRevenue;}}); const fg=v=>v>=1000?'£'+(v/1000).toFixed(1)+'k':'£'+Math.round(v); return paidAll > 0 ? `<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;"><div style="color:#34d399;">All-time: <b>${paidAll.toLocaleString()}</b> bkgs · <b>${fg(revAll)}</b></div><div style="color:#67e8f9;">Last 30d: <b>${bk30}</b> bkgs · <b>${fg(rev30)}</b></div>` : ''; })()}
           ${totalCap === 0 && totalSearches > 0 ? '<div style="color:#f87171;font-weight:600;margin-top:4px;">&#9888; Supply gap!</div>' : ''}
         </div>
       `);
@@ -2990,19 +2991,26 @@ function renderMapTab() {
       }).addTo(fullMap);
 
       const avgRating = sp.reviews > 0 ? (sp.rating / sp.reviews).toFixed(1) : '—';
+      const bk = bookingStatsMap.get(sp.id);
+      const fmtGbp = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
       marker.bindPopup(`
-        <div style="font-size:13px;min-width:180px;">
+        <div style="font-size:13px;min-width:220px;">
           <div style="font-weight:700;margin-bottom:2px;color:#38bdf8;">${sp.name}</div>
           <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">${sp.locationName}</div>
           <div>${sp.address}</div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
           <div>Capacity: <b>${sp.capacity} bags</b></div>
-          <div>Bookings: <b>${sp.bookings}</b></div>
           <div>Rating: <b>${avgRating}</b> (${sp.reviews} reviews)</div>
           <div>Status: <b style="color:${isActive ? '#34d399' : '#f87171'}">${isActive ? 'Active' : 'Inactive'}</b></div>
-          <div>Type: ${sp.type || '—'}</div>
-          ${sp.open24 ? '<div style="color:#34d399;">Open 24/7</div>' : ''}
-          ${sp.openLate ? '<div style="color:#fbbf24;">Open Late</div>' : ''}
+          <div>Type: ${sp.type || '—'} · Quality: ${sp.quality}/5</div>
+          ${sp.open24 ? '<div style="color:#34d399;">Open 24/7</div>' : sp.openLate ? '<div style="color:#fbbf24;">Open Late</div>' : ''}
+          ${bk ? `<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
+          <div style="font-weight:600;color:#34d399;margin-bottom:2px;">Booking Performance</div>
+          <div>All-time: <b>${bk.paidBookings.toLocaleString()}</b> paid bookings</div>
+          <div>Revenue: <b style="color:#34d399;">${fmtGbp(bk.totalRevenue)}</b></div>
+          <div>Last 30d: <b>${bk.bookings30d}</b> bkgs · <b style="color:#67e8f9;">${fmtGbp(bk.revenue30d)}</b></div>
+          <div>Last 90d: <b>${bk.bookings90d}</b> bkgs</div>
+          <div>Avg bags: <b>${bk.avgBags}</b></div>` : ''}
         </div>
       `);
 
