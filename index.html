@@ -418,7 +418,7 @@
 
     /* Leaflet customization */
     .leaflet-container { background: #0d1117; }
-    .leaflet-tile { filter: brightness(0.7) saturate(0.8) contrast(1.1); }
+    .leaflet-tile { filter: brightness(0.75) saturate(0.5) contrast(1.1); }
     .custom-marker {
       border-radius: 50%;
       border: 2px solid rgba(255,255,255,0.6);
@@ -789,17 +789,17 @@
 </div>
 
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="opportunity">Opportunity</button>
+  <button class="tab-btn active" data-tab="map">Map</button>
+  <button class="tab-btn" data-tab="opportunity">Opportunity</button>
   <button class="tab-btn" data-tab="performing">Performing Well</button>
   <button class="tab-btn" data-tab="underperforming">Underperforming</button>
   <button class="tab-btn" data-tab="seo">SEO Intelligence</button>
-  <button class="tab-btn" data-tab="map">Map</button>
 </div>
 
-<div class="layout">
+<div class="layout map-active">
   <div class="main-panel">
     <!-- TAB: Opportunity -->
-    <div class="tab-content active" id="tab-opportunity">
+    <div class="tab-content" id="tab-opportunity">
       <div class="kpi-strip" id="kpiStrip"></div>
       <div class="content-area">
         <div class="scatter-section">
@@ -870,7 +870,7 @@
     </div>
 
     <!-- TAB: Map -->
-    <div class="tab-content" id="tab-map">
+    <div class="tab-content active" id="tab-map">
       <div id="fullMap"></div>
       <div class="map-controls">
         <input type="text" id="mapSearchBox" placeholder="Search city or location…" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:12px;width:220px;outline:none;" />
@@ -882,6 +882,11 @@
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#34d399"></div> Good (&gt;8% CVR)</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#fbbf24"></div> Average (4-8% CVR)</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#f87171"></div> Low (&lt;4% CVR)</div>
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:8px 0 6px;">Dot Size (Searches)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--text-muted);width:6px;height:6px;"></div> Low (&lt;500)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--text-muted);width:10px;height:10px;"></div> Medium (500–2K)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--text-muted);width:14px;height:14px;"></div> High (2K–5K)</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--text-muted);width:20px;height:20px;"></div> Very High (5K+)</div>
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:8px 0 6px;">Supply (StashPoints)</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#38bdf8;border:1px solid rgba(255,255,255,0.4);"></div> Active StashPoint</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:rgba(56,189,248,0.3);border:1px dashed rgba(255,255,255,0.3);"></div> Inactive StashPoint</div>
@@ -1425,7 +1430,7 @@ function selectLocation(d) {
       attributionControl: false,
     }).setView([d.lat, d.lng], 15);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
     }).addTo(minimap);
   } else {
@@ -2111,7 +2116,7 @@ function renderSeoDetail(seoData) {
 }
 
 // ─── Tab System ───
-let activeTab = 'opportunity';
+let activeTab = 'map';
 let fullMap = null;
 let fullMapMarkers = [];
 
@@ -2539,8 +2544,16 @@ function renderMapTab() {
       attributionControl: false,
     }).setView([48, 2], 5);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
+      opacity: 1,
+    }).addTo(fullMap);
+
+    // Add labels layer on top for readability
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      opacity: 0.9,
+      pane: 'overlayPane',
     }).addTo(fullMap);
   }
 
@@ -2559,14 +2572,18 @@ function renderMapTab() {
       const avgCvr = totalSearches > 0 ? totalConv / totalSearches : 0;
       const avgOpp = Math.round(cluster.pois.reduce((s, d) => s + d.opportunity_score, 0) / cluster.pois.length);
       const color = avgCvr > 0.08 ? '#34d399' : avgCvr >= 0.04 ? '#fbbf24' : '#f87171';
-      const radius = Math.max(5, Math.min(18, Math.sqrt(totalSearches / 30)));
+      // Incremental dot sizing: small (<500), medium (500-2000), large (2000-5000), XL (5000+)
+      const radius = totalSearches < 500 ? 5
+        : totalSearches < 2000 ? 9
+        : totalSearches < 5000 ? 14
+        : 20;
 
       const marker = L.circleMarker([cluster.lat, cluster.lng], {
         radius: radius,
         fillColor: color,
-        color: 'rgba(255,255,255,0.4)',
-        weight: cluster.pois.length > 1 ? 2 : 1,
-        fillOpacity: 0.75,
+        color: 'rgba(255,255,255,0.6)',
+        weight: cluster.pois.length > 1 ? 2 : 1.5,
+        fillOpacity: 0.85,
       }).addTo(fullMap);
 
       const nearbySp = findNearbyStashpoints(cluster.lat, cluster.lng, 0.5);
