@@ -796,7 +796,6 @@
   <button class="tab-btn" data-tab="opportunity">Opportunity</button>
   <button class="tab-btn" data-tab="performing">Performing Well</button>
   <button class="tab-btn" data-tab="underperforming">Underperforming</button>
-  <button class="tab-btn" data-tab="seo">SEO Intelligence</button>
 </div>
 
 <div class="layout map-active">
@@ -805,20 +804,11 @@
     <div class="tab-content" id="tab-opportunity">
       <div class="kpi-strip" id="kpiStrip"></div>
       <div class="content-area">
-        <div class="scatter-section">
+        <div class="scatter-section" style="flex:1;display:flex;flex-direction:column;">
           <h2>Demand vs Conversion — Opportunity Quadrants</h2>
-          <div class="scatter-container" id="scatterContainer">
+          <div class="scatter-container" id="scatterContainer" style="flex:1;height:auto;min-height:400px;">
             <canvas id="scatterChart"></canvas>
             <div class="scatter-tooltip" id="scatterTooltip"></div>
-          </div>
-        </div>
-        <div class="table-section">
-          <h2>Opportunity Ranking</h2>
-          <div class="table-scroll" id="tableScroll">
-            <table>
-              <thead id="tableHead"></thead>
-              <tbody id="tableBody"></tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -834,22 +824,6 @@
             <table>
               <thead id="perfTableHead"></thead>
               <tbody id="perfTableBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: SEO Intelligence -->
-    <div class="tab-content" id="tab-seo">
-      <div class="kpi-strip" id="seoKpiStrip"></div>
-      <div class="content-area">
-        <div class="table-section">
-          <h2 style="display:flex;align-items:center;">SEO Data by Location <button class="seo-fetch-btn" id="seoFetchBtn">Fetch SEO for Visible</button><span id="seoFetchProgress" style="font-size:11px;color:var(--text-muted);margin-left:8px;font-weight:400;"></span></h2>
-          <div class="table-scroll" id="seoTableScroll">
-            <table>
-              <thead id="seoTableHead"></thead>
-              <tbody id="seoTableBody"></tbody>
             </table>
           </div>
         </div>
@@ -1370,6 +1344,7 @@ document.getElementById('scatterChart').addEventListener('click', function(e) {
 
 // ─── Table ───
 function renderTable() {
+  if (!document.getElementById('tableHead')) return; // table removed
   const cols = [
     { key: 'opportunity_score', label: 'Score', width: '70px' },
     { key: 'name', label: 'Location' },
@@ -2510,8 +2485,6 @@ function switchTab(tabName) {
     renderPerformingTab();
   } else if (tabName === 'underperforming') {
     renderUnderperformingTab();
-  } else if (tabName === 'seo') {
-    renderSeoTab();
   } else if (tabName === 'map') {
     setTimeout(() => renderMapTab(), 50);
   }
@@ -2840,30 +2813,6 @@ function renderSeoTab() {
 }
 
 // SEO Fetch All button
-document.getElementById('seoFetchBtn').addEventListener('click', async function() {
-  const btn = this;
-  const progress = document.getElementById('seoFetchProgress');
-  btn.disabled = true;
-
-  const toFetch = filteredData.filter(d => {
-    const key = `${d.name || ''}|${d.city}|${d.country}`;
-    return !seoCache.has(key);
-  }).slice(0, 50); // Limit to 50 at a time
-
-  for (let i = 0; i < toFetch.length; i++) {
-    const d = toFetch[i];
-    progress.textContent = `Fetching ${i + 1}/${toFetch.length}...`;
-    await fetchSeoData(d.name, d.city, d.country, d.lat, d.lng);
-    // Small delay to avoid rate limiting
-    if (i < toFetch.length - 1) await new Promise(r => setTimeout(r, 500));
-  }
-
-  progress.textContent = `Done! ${toFetch.length} fetched.`;
-  btn.disabled = false;
-  renderSeoTab();
-  setTimeout(() => { progress.textContent = ''; }, 3000);
-});
-
 // ─── Map Tab ───
 // Cluster POIs within a given radius (km) using greedy clustering
 function clusterPois(data, radiusKm) {
