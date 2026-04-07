@@ -2514,9 +2514,10 @@ function clusterPois(data, radiusKm) {
     if (used.has(i)) return;
     used.add(i);
     const cluster = { pois: [d], lat: d.lat, lng: d.lng };
-    // Find all unused POIs within radius
+    // Find all unused POIs within radius — only cluster low-search POIs
     sorted.forEach((other, j) => {
       if (j === i || used.has(j)) return;
+      if (other.searches >= 500) return; // high-search POIs always stand alone
       if (haversine(d.lat, d.lng, other.lat, other.lng) <= radiusKm) {
         cluster.pois.push(other);
         used.add(j);
@@ -2565,7 +2566,7 @@ function renderMapTab() {
 
   // POI demand markers — aggregate within 500m
   if (showPoiMarkers) {
-    const clusters = clusterPois(filteredData, 0.5);
+    const clusters = clusterPois(filteredData, 0.15);
     clusters.forEach(cluster => {
       const totalSearches = cluster.pois.reduce((s, d) => s + d.searches, 0);
       const totalConv = cluster.pois.reduce((s, d) => s + d.conversions, 0);
