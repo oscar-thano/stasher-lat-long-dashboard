@@ -797,7 +797,6 @@
   <button class="tab-btn" data-tab="performing">Performing Well</button>
   <button class="tab-btn" data-tab="underperforming">Underperforming</button>
   <button class="tab-btn" data-tab="seo">SEO Intelligence</button>
-  <button class="tab-btn" data-tab="organic">Organic Presence</button>
 </div>
 
 <div class="layout map-active">
@@ -851,35 +850,6 @@
             <table>
               <thead id="seoTableHead"></thead>
               <tbody id="seoTableBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: Organic Presence -->
-    <div class="tab-content" id="tab-organic">
-      <div class="kpi-strip" id="organicKpiStrip"></div>
-      <div class="content-area">
-        <div class="table-section">
-          <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            Organic Presence — stasher.com
-            <button class="seo-fetch-btn" id="organicFetchBtn">Fetch Domain Data</button>
-            <span id="organicFetchProgress" style="font-size:11px;color:var(--text-muted);font-weight:400;"></span>
-            <span style="flex:1"></span>
-            <select id="organicCountryFilter" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
-              <option value="all">All Countries</option>
-            </select>
-            <select id="organicPageFilter" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
-              <option value="all">All Pages</option>
-              <option value="city">City Pages Only</option>
-              <option value="area">Area Pages Only</option>
-            </select>
-          </h2>
-          <div class="table-scroll" id="organicTableScroll">
-            <table>
-              <thead id="organicTableHead"></thead>
-              <tbody id="organicTableBody"></tbody>
             </table>
           </div>
         </div>
@@ -2518,8 +2488,6 @@ function switchTab(tabName) {
     renderSeoTab();
   } else if (tabName === 'map') {
     setTimeout(() => renderMapTab(), 50);
-  } else if (tabName === 'organic') {
-    renderOrganicTab();
   }
 }
 
@@ -2869,20 +2837,6 @@ document.getElementById('seoFetchBtn').addEventListener('click', async function(
   renderSeoTab();
   setTimeout(() => { progress.textContent = ''; }, 3000);
 });
-
-// ─── Organic Presence Tab: Event Listeners ───
-document.getElementById('organicFetchBtn').addEventListener('click', async function() {
-  const btn = this;
-  btn.disabled = true;
-  btn.textContent = 'Fetching…';
-  await fetchDomainRankedKeywords();
-  btn.disabled = false;
-  btn.textContent = 'Fetch Domain Data';
-  renderOrganicTab();
-});
-
-document.getElementById('organicPageFilter').addEventListener('change', () => renderOrganicTab());
-document.getElementById('organicCountryFilter').addEventListener('change', () => renderOrganicTab());
 
 // ─── Map Tab ───
 // Cluster POIs within a given radius (km) using greedy clustering
