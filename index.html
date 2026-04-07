@@ -2020,6 +2020,8 @@ function renderSeoDetail(seoData) {
   html += renderSeoKeywordTable(seoData.keywords);
 
   // Stasher SERP position
+  const serpKeyword = seoData.searchTerm || seoData.locationTerm || '';
+  html += `<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:12px 0 6px;">SERP for: <span style="color:var(--accent-light);text-transform:none;">"${serpKeyword}"</span></div>`;
   html += `<div class="detail-stat-row" style="margin-bottom:4px">
     <span class="stat-label">Stasher Organic Position</span>
     <span class="stat-value">${seoData.rank != null ? getSerpBadgeHtml(seoData.rank) : '<span class="serp-badge serp-nr">Not Ranking</span>'}</span>
