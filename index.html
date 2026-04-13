@@ -8,29 +8,35 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
     :root {
-      --bg: #0a0e17;
-      --surface: #111827;
-      --surface-2: #1a2236;
-      --border: #1e293b;
-      --text: #e2e8f0;
-      --text-muted: #94a3b8;
+      --bg: #090d16;
+      --surface: #0f1420;
+      --surface-2: #161d2e;
+      --border: rgba(255,255,255,0.06);
+      --text: #f0f2f5;
+      --text-muted: #7a8599;
       --accent: #6366f1;
-      --accent-light: #818cf8;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --success: #10b981;
-      --cyan: #06b6d4;
+      --accent-light: #a5b4fc;
+      --danger: #f87171;
+      --warning: #fbbf24;
+      --success: #34d399;
+      --cyan: #22d3ee;
+      --radius: 12px;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       overflow: hidden;
       height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.01em;
     }
 
     /* Top bar */
@@ -38,16 +44,18 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 24px;
-      background: var(--surface);
+      padding: 0 24px;
+      background: rgba(15,20,32,0.8);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
-      height: 56px;
+      height: 52px;
       z-index: 100;
     }
     .topbar h1 {
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
     }
     .topbar h1 span { color: var(--accent-light); }
     .topbar-controls {
@@ -56,16 +64,22 @@
       align-items: center;
     }
     .topbar-controls select, .topbar-controls input {
-      background: var(--surface-2);
+      background: rgba(255,255,255,0.04);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
       outline: none;
+      transition: all 0.2s;
+    }
+    .topbar-controls select:hover, .topbar-controls input:hover {
+      background: rgba(255,255,255,0.06);
     }
     .topbar-controls select:focus, .topbar-controls input:focus {
       border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
     }
 
     /* Layout */
@@ -92,10 +106,14 @@
       border-bottom: 1px solid var(--border);
     }
     .kpi-card {
-      background: var(--surface-2);
-      border-radius: 8px;
-      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border-radius: var(--radius);
+      padding: 14px 18px;
       border: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+    .kpi-card:hover {
+      background: rgba(255,255,255,0.04);
     }
     .kpi-card .label, .kpi-card .kpi-label {
       font-size: 10px;
@@ -171,8 +189,9 @@
     .table-scroll {
       flex: 1;
       overflow-y: auto;
-      border-radius: 10px;
+      border-radius: var(--radius);
       border: 1px solid var(--border);
+      background: rgba(255,255,255,0.01);
     }
     .table-scroll::-webkit-scrollbar { width: 6px; }
     .table-scroll::-webkit-scrollbar-track { background: var(--surface); }
@@ -189,30 +208,30 @@
       z-index: 2;
     }
     thead th {
-      background: var(--surface-2);
+      background: rgba(255,255,255,0.03);
       padding: 10px 14px;
       text-align: left;
       font-weight: 600;
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       color: var(--text-muted);
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
     }
-    thead th:hover { color: var(--text); }
+    thead th:hover { color: var(--text); background: rgba(255,255,255,0.05); }
     thead th.sorted-asc::after { content: ' ↑'; color: var(--accent-light); }
     thead th.sorted-desc::after { content: ' ↓'; color: var(--accent-light); }
     tbody tr {
-      border-bottom: 1px solid rgba(30,41,59,0.5);
+      border-bottom: 1px solid var(--border);
       cursor: pointer;
-      transition: background 0.15s;
+      transition: all 0.15s;
     }
-    tbody tr:nth-child(even) { background: rgba(17,24,39,0.4); }
-    tbody tr:hover { background: rgba(99, 102, 241, 0.08); }
-    tbody tr.selected { background: rgba(99, 102, 241, 0.15); }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,0.01); }
+    tbody tr:hover { background: rgba(99, 102, 241, 0.06); }
+    tbody tr.selected { background: rgba(99, 102, 241, 0.1); box-shadow: inset 3px 0 0 var(--accent); }
     tbody td {
       padding: 10px 14px;
       white-space: nowrap;
@@ -247,10 +266,11 @@
     /* Conversion rate badge */
     .conv-badge {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
     .conv-low { background: rgba(239,68,68,0.15); color: #f87171; }
     .conv-med { background: rgba(245,158,11,0.15); color: #fbbf24; }
@@ -287,7 +307,8 @@
 
     /* Right: minimap panel */
     .minimap-panel {
-      background: var(--surface);
+      background: rgba(15,20,32,0.7);
+      backdrop-filter: blur(16px);
       border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
@@ -348,10 +369,10 @@
       margin-bottom: 12px;
     }
     .detail-metric-card {
-      background: var(--surface-2);
+      background: rgba(255,255,255,0.03);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
+      border-radius: 10px;
+      padding: 12px 14px;
     }
     .detail-metric-card .dm-value {
       font-size: 20px;
@@ -622,29 +643,33 @@
     .tab-bar {
       display: flex;
       align-items: center;
-      gap: 0;
-      padding: 0 24px;
-      background: var(--surface);
+      gap: 2px;
+      padding: 0 20px;
+      background: rgba(15,20,32,0.6);
+      backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
-      height: 40px;
+      height: 42px;
       flex-shrink: 0;
     }
     .tab-btn {
-      padding: 10px 20px;
-      font-size: 13px;
-      font-weight: 500;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
       color: var(--text-muted);
       cursor: pointer;
       border: none;
       background: none;
       border-bottom: 2px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
+      border-radius: 6px 6px 0 0;
+      transition: all 0.2s;
       white-space: nowrap;
+      letter-spacing: -0.01em;
     }
-    .tab-btn:hover { color: var(--text); }
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
     .tab-btn.active {
-      color: var(--accent-light);
+      color: var(--text);
       border-bottom-color: var(--accent-light);
+      background: rgba(99,102,241,0.06);
     }
     .tab-content { display: none; }
     .tab-content.active { display: flex; flex-direction: column; }
@@ -971,18 +996,22 @@ let allStashpoints = [];
 let selectedRow = null;
 let minimap = null;
 let minimapMarkers = [];
-let sortCol = 'opportunity_score';
+let sortCol = 'searches';
 let sortDir = 'desc';
 
 // ─── Data loading ───
 const bookingStatsMap = new Map(); // stashpoint_id → booking stats
+const openingHoursMap = new Map(); // stashpoint_id → parsed opening hours
+const tempClosureSet = new Set(); // stashpoint IDs with active temporary closures
 
 async function loadData() {
   try {
-    const [poiResp, spResp, bkResp] = await Promise.all([
+    const [poiResp, spResp, bkResp, ohResp, tcResp] = await Promise.all([
       fetch(CSV_URL),
       fetch(SP_CSV_URL),
       fetch('booking_stats.csv').catch(() => null),
+      fetch('opening_hours.csv').catch(() => null),
+      fetch('temp_closures.csv').catch(() => null),
     ]);
     const poiText = await poiResp.text();
     const spText = await spResp.text();
@@ -1009,6 +1038,42 @@ async function loadData() {
         });
       });
       console.log(`Loaded booking stats for ${bookingStatsMap.size} stashpoints`);
+    }
+
+    // Load opening hours
+    if (ohResp && ohResp.ok) {
+      const ohText = await ohResp.text();
+      const ohParsed = Papa.parse(ohText, { header: true, skipEmptyLines: true });
+      openingHoursMap.clear();
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      ohParsed.data.forEach(r => {
+        if (!r.stashpoint_id || !r.hours) return;
+        const days = {};
+        r.hours.split('|').forEach(slot => {
+          const firstColon = slot.indexOf(':');
+          if (firstColon === -1) return;
+          const day = parseInt(slot.substring(0, firstColon));
+          const times = slot.substring(firstColon + 1); // e.g. "08:00-20:00"
+          if (isNaN(day)) return;
+          if (!days[day]) days[day] = [];
+          days[day].push(times);
+        });
+        const schedule = [];
+        for (let i = 0; i < 7; i++) {
+          schedule.push({ day: dayNames[i], hours: days[i] ? days[i].join(', ') : 'Closed' });
+        }
+        openingHoursMap.set(r.stashpoint_id, schedule);
+      });
+      console.log(`Loaded opening hours for ${openingHoursMap.size} stashpoints`);
+    }
+
+    // Load temporary closures
+    if (tcResp && tcResp.ok) {
+      const tcText = await tcResp.text();
+      const tcParsed = Papa.parse(tcText, { header: true, skipEmptyLines: true });
+      tempClosureSet.clear();
+      tcParsed.data.forEach(r => { if (r.stashpoint_id) tempClosureSet.add(r.stashpoint_id); });
+      console.log(`Loaded ${tempClosureSet.size} temporary closures`);
     }
 
     processStashpoints(spParsed.data);
@@ -1204,11 +1269,6 @@ function renderKPIs() {
       <div class="sub">benchmark: 15%</div>
     </div>
     <div class="kpi-card">
-      <div class="label">Missed Conversions</div>
-      <div class="value" style="color:var(--danger)">${totalMissed.toLocaleString()}</div>
-      <div class="sub">vs 15% benchmark</div>
-    </div>
-    <div class="kpi-card">
       <div class="label">Zero Stashpoints</div>
       <div class="value" style="color:var(--danger)">${zeroSP}</div>
       <div class="sub">${total > 0 ? ((zeroSP/total*100).toFixed(0)) : 0}% of locations</div>
@@ -1384,7 +1444,6 @@ document.getElementById('scatterChart').addEventListener('mousemove', function(e
       <div class="tt-row"><span>Searches</span><span>${d.searches.toLocaleString()}</span></div>
       <div class="tt-row"><span>Conversion</span><span>${(d.conversion_rate * 100).toFixed(1)}%</span></div>
       <div class="tt-row"><span>Stashpoints</span><span>${d.stashpoints}</span></div>
-      <div class="tt-row"><span>Opportunity</span><span style="color:var(--accent-light);font-weight:700">${d.opportunity_score}/100</span></div>
     `;
     this.style.cursor = 'pointer';
   } else {
@@ -1543,7 +1602,6 @@ function selectLocation(d) {
   // Detail stats — card layout for key metrics
   const convColor = d.conversion_rate < 0.07 ? 'var(--danger)' : d.conversion_rate < 0.12 ? 'var(--warning)' : 'var(--success)';
   const spColor = d.stashpoints === 0 ? 'var(--danger)' : d.stashpoints < 5 ? 'var(--warning)' : 'var(--success)';
-  const oppColor = d.opportunity_score >= 70 ? 'var(--danger)' : d.opportunity_score >= 50 ? 'var(--warning)' : 'var(--success)';
 
   document.getElementById('detailStats').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -1571,14 +1629,6 @@ function selectLocation(d) {
       </div>
     </div>
 
-    <div class="detail-stat-row">
-      <span class="stat-label">Opportunity Score</span>
-      <span class="stat-value"><span style="display:inline-block;width:50px;height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;vertical-align:middle;margin-right:6px;"><span style="display:block;height:100%;width:${d.opportunity_score}%;background:${oppColor};border-radius:3px;"></span></span><span style="color:${oppColor};">${d.opportunity_score}/100</span></span>
-    </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">Missed Conversions</span>
-      <span class="stat-value" style="color:var(--danger)">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() + ' /mo' : '—'}</span>
-    </div>
     ${d.details ? `<div style="margin-top:10px;padding:10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);font-size:11px;color:var(--text-muted);line-height:1.5;">${d.details}</div>` : ''}
   `;
 
@@ -2564,30 +2614,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // ─── Performing Tab ───
 function renderPerformingTab() {
   const perfData = filteredData.filter(d => d.conversion_rate > 0.08);
-  perfData.sort((a, b) => b.conversion_rate - a.conversion_rate);
+  perfData.sort((a, b) => b.searches - a.searches); // ranked by searches, highest first
 
-  // KPIs
   const total = perfData.length;
   const totalSearches = perfData.reduce((s, d) => s + d.searches, 0);
   const totalConv = perfData.reduce((s, d) => s + d.conversions, 0);
   const avgConv = totalSearches > 0 ? (totalConv / totalSearches * 100).toFixed(1) : 0;
-  const avgOpp = total > 0 ? Math.round(perfData.reduce((s, d) => s + d.opportunity_score, 0) / total) : 0;
-  const topCity = total > 0 ? (() => {
-    const cities = {};
-    perfData.forEach(d => { cities[d.city] = (cities[d.city] || 0) + 1; });
-    return Object.entries(cities).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-  })() : '—';
+  const totalSp = perfData.reduce((s, d) => s + d.stashpoints, 0);
+  const zeroCvr = perfData.filter(d => d.conversion_rate >= 0.15).length;
 
   document.getElementById('perfKpiStrip').innerHTML = `
     <div class="kpi-card">
-      <div class="label">Performing Locations</div>
+      <div class="label">Performing</div>
       <div class="value" style="color:var(--success)">${total}</div>
       <div class="sub">above 8% CVR</div>
     </div>
     <div class="kpi-card">
       <div class="label">Total Searches</div>
       <div class="value">${totalSearches.toLocaleString()}</div>
-      <div class="sub">in performing areas</div>
+      <div class="sub">demand in these areas</div>
     </div>
     <div class="kpi-card">
       <div class="label">Avg. Conversion</div>
@@ -2595,31 +2640,24 @@ function renderPerformingTab() {
       <div class="sub">well above benchmark</div>
     </div>
     <div class="kpi-card">
-      <div class="label">Avg. Opp. Score</div>
-      <div class="value">${avgOpp}</div>
-      <div class="sub">lower = less opportunity</div>
+      <div class="label">Total Conversions</div>
+      <div class="value" style="color:var(--success)">${totalConv.toLocaleString()}</div>
+      <div class="sub">${total > 0 ? ((totalConv / total).toFixed(0)) : 0} avg per location</div>
     </div>
     <div class="kpi-card">
-      <div class="label">Top City</div>
-      <div class="value" style="font-size:16px">${topCity}</div>
-      <div class="sub">most performing locations</div>
-    </div>
-    <div class="kpi-card">
-      <div class="label">Share of Total</div>
-      <div class="value" style="color:var(--success)">${allData.length > 0 ? ((total / filteredData.length) * 100).toFixed(0) : 0}%</div>
-      <div class="sub">of filtered locations</div>
+      <div class="label">Star Performers</div>
+      <div class="value" style="color:var(--cyan)">${zeroCvr}</div>
+      <div class="sub">above 15% CVR</div>
     </div>
   `;
 
-  // Table
   const cols = [
-    { key: 'conversion_rate', label: 'Conv. Rate', width: '100px' },
+    { key: 'searches', label: 'Searches', width: '90px' },
     { key: 'name', label: 'Location' },
     { key: 'cvr_tier_label', label: 'CVR Tier', width: '110px' },
+    { key: 'conversion_rate', label: 'Conv. Rate', width: '95px' },
     { key: 'type', label: 'Type', width: '110px' },
     { key: 'city', label: 'City', width: '100px' },
-    { key: 'searches', label: 'Searches', width: '85px' },
-    { key: 'conversions', label: 'Conversions', width: '95px' },
     { key: 'stashpoints', label: 'Stashpoints', width: '90px' },
   ];
 
@@ -2630,21 +2668,19 @@ function renderPerformingTab() {
 
   const tbody = document.getElementById('perfTableBody');
   tbody.innerHTML = perfData.slice(0, 200).map((d, i) => {
-    const convClass = d.conversion_rate >= 0.15 ? 'conv-high' : d.conversion_rate >= 0.10 ? 'conv-med' : 'conv-high';
+    const convClass = d.conversion_rate >= 0.15 ? 'conv-high' : 'conv-med';
     const spClass = d.stashpoints === 0 ? 'sp-none' : d.stashpoints < 5 ? 'sp-low' : 'sp-ok';
     return `<tr class="row-performing" data-perf-idx="${i}">
-      <td><span class="conv-badge conv-high">${(d.conversion_rate * 100).toFixed(1)}%</span></td>
+      <td style="font-weight:700">${d.searches.toLocaleString()}</td>
       <td style="font-weight:500">${d.name || '—'}</td>
       <td><span class="tier-badge ${d.cvr_tier.cls}">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></td>
+      <td><span class="conv-badge ${convClass}">${(d.conversion_rate * 100).toFixed(1)}%</span></td>
       <td>${d.type ? `<span class="type-tag">${d.type}</span>` : '—'}</td>
       <td>${d.city}</td>
-      <td>${d.searches.toLocaleString()}</td>
-      <td>${d.conversions.toLocaleString()}</td>
       <td><span class="sp-badge ${spClass}">${d.stashpoints}</span></td>
     </tr>`;
   }).join('');
 
-  // Click to select
   tbody.querySelectorAll('tr').forEach(tr => {
     tr.addEventListener('click', () => {
       const idx = parseInt(tr.dataset.perfIdx);
@@ -2652,7 +2688,6 @@ function renderPerformingTab() {
     });
   });
 
-  // Auto-select first row if nothing selected
   if (perfData.length > 0 && (!selectedRow || !perfData.find(d => d.lat === selectedRow.lat && d.lng === selectedRow.lng))) {
     selectLocation(perfData[0]);
   }
@@ -2689,11 +2724,6 @@ function renderUnderperformingTab() {
       <div class="sub">vs 15% benchmark</div>
     </div>
     <div class="kpi-card">
-      <div class="label">Missed Conversions</div>
-      <div class="value" style="color:var(--danger)">${totalMissed.toLocaleString()}</div>
-      <div class="sub">revenue opportunity</div>
-    </div>
-    <div class="kpi-card">
       <div class="label">Zero Conversions</div>
       <div class="value" style="color:var(--danger)">${zeroCvr}</div>
       <div class="sub">${total > 0 ? ((zeroCvr / total * 100).toFixed(0)) : 0}% of underperformers</div>
@@ -2714,8 +2744,6 @@ function renderUnderperformingTab() {
     { key: 'type', label: 'Type', width: '110px' },
     { key: 'city', label: 'City', width: '100px' },
     { key: 'stashpoints', label: 'Stashpoints', width: '90px' },
-    { key: 'missed_conversions', label: 'Missed Conv.', width: '95px' },
-    { key: 'opportunity_score', label: 'Score', width: '70px' },
   ];
 
   const thead = document.getElementById('underTableHead');
@@ -2727,7 +2755,6 @@ function renderUnderperformingTab() {
   tbody.innerHTML = underData.slice(0, 200).map((d, i) => {
     const convClass = d.conversion_rate < 0.04 ? 'conv-low' : d.conversion_rate < 0.07 ? 'conv-low' : 'conv-med';
     const spClass = d.stashpoints === 0 ? 'sp-none' : d.stashpoints < 5 ? 'sp-low' : 'sp-ok';
-    const oppColor = d.opportunity_score >= 70 ? 'var(--danger)' : d.opportunity_score >= 50 ? 'var(--warning)' : 'var(--success)';
     return `<tr data-under-idx="${i}">
       <td style="font-weight:700">${d.searches.toLocaleString()}</td>
       <td style="font-weight:500">${d.name || '—'}</td>
@@ -2736,8 +2763,6 @@ function renderUnderperformingTab() {
       <td>${d.type ? `<span class="type-tag">${d.type}</span>` : '—'}</td>
       <td>${d.city}</td>
       <td><span class="sp-badge ${spClass}">${d.stashpoints}</span></td>
-      <td style="color:var(--danger);font-weight:600">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() : '—'}</td>
-      <td><span style="color:${oppColor};font-weight:700">${d.opportunity_score}</span></td>
     </tr>`;
   }).join('');
 
@@ -2973,7 +2998,7 @@ function renderCityView(cityKey) {
       <div class="kpi-card"><div class="kpi-value" style="color:${cvrColor};">${avgCvr}%</div><div class="kpi-label">Avg CVR</div><div class="kpi-sub">${totalConversions.toLocaleString()} conversions</div></div>
       <div class="kpi-card"><div class="kpi-value" style="color:var(--cyan);">${activeSp.length}</div><div class="kpi-label">StashPoints</div><div class="kpi-sub">${totalCap} bag capacity</div></div>
       <div class="kpi-card"><div class="kpi-value" style="color:var(--success);">${fmtG(cityRev30d)}</div><div class="kpi-label">Revenue (30d)</div><div class="kpi-sub">${cityBk30d} bookings</div></div>
-      <div class="kpi-card"><div class="kpi-value" style="color:var(--danger);">${Math.round(missedConv).toLocaleString()}</div><div class="kpi-label">Missed Conv.</div><div class="kpi-sub">vs 15% benchmark</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--success);">${fmtG(cityRevTotal)}</div><div class="kpi-label">Total Revenue</div><div class="kpi-sub">all-time GBP</div></div>
     `;
   }
 
@@ -3135,7 +3160,6 @@ function renderCityView(cityKey) {
     { key: 'spCount', label: 'SPs', width: '60px' },
     { key: 'bk30d', label: 'Bkgs 30d', width: '80px' },
     { key: 'rev30d', label: 'Rev 30d', width: '85px' },
-    { key: 'missed_conversions', label: 'Missed', width: '75px' },
   ];
 
   const thead = document.getElementById('cityTableHead');
@@ -3168,7 +3192,6 @@ function renderCityView(cityKey) {
         <td><span class="badge ${spBadge}">${d.spCount}</span></td>
         <td>${d.bk30d > 0 ? d.bk30d : '<span style="color:var(--text-muted);">—</span>'}</td>
         <td>${d.rev30d > 0 ? '<span style="color:var(--success);">' + fmtG(d.rev30d) + '</span>' : '<span style="color:var(--text-muted);">—</span>'}</td>
-        <td style="color:var(--danger);">${Math.round(d.missed_conversions) > 0 ? Math.round(d.missed_conversions) : '—'}</td>
       </tr>`;
     }).join('');
     // Click row → select location
@@ -3253,54 +3276,59 @@ function renderMapTab() {
   fullMapSpMarkers.forEach(m => fullMap.removeLayer(m));
   fullMapSpMarkers = [];
 
-  // POI demand markers — aggregate within 500m
+  // POI demand markers — individual dots like city breakdown
   if (showPoiMarkers) {
-    const clusters = clusterPois(filteredData, 0.15);
-    clusters.forEach(cluster => {
-      const totalSearches = cluster.pois.reduce((s, d) => s + d.searches, 0);
-      const totalConv = cluster.pois.reduce((s, d) => s + d.conversions, 0);
-      const avgCvr = totalSearches > 0 ? totalConv / totalSearches : 0;
-      const avgOpp = Math.round(cluster.pois.reduce((s, d) => s + d.opportunity_score, 0) / cluster.pois.length);
-      const color = avgCvr > 0.08 ? '#34d399' : avgCvr >= 0.04 ? '#fbbf24' : '#f87171';
-      // Incremental dot sizing: small (<500), medium (500-2000), large (2000-5000), XL (5000+)
-      const radius = totalSearches < 500 ? 5
-        : totalSearches < 2000 ? 9
-        : totalSearches < 5000 ? 14
-        : 20;
+    const fmtG = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
+    filteredData.forEach(d => {
+      const color = d.conversion_rate > 0.08 ? '#34d399' : d.conversion_rate >= 0.04 ? '#fbbf24' : '#f87171';
+      const radius = d.searches < 500 ? 5 : d.searches < 2000 ? 9 : d.searches < 5000 ? 14 : 20;
 
-      const marker = L.circleMarker([cluster.lat, cluster.lng], {
-        radius: radius,
-        fillColor: color,
-        color: 'rgba(255,255,255,0.6)',
-        weight: cluster.pois.length > 1 ? 2 : 1.5,
-        fillOpacity: 0.85,
+      const marker = L.circleMarker([d.lat, d.lng], {
+        radius, fillColor: color, color: 'rgba(255,255,255,0.6)', weight: 1.5, fillOpacity: 0.85,
       }).addTo(fullMap);
 
-      const nearbySp = findNearbyStashpoints(cluster.lat, cluster.lng, 0.5);
+      const nearbySp = findNearbyStashpoints(d.lat, d.lng, 0.5);
       const activeSp = nearbySp.filter(sp => sp.active);
       const totalCap = activeSp.reduce((s, sp) => s + sp.capacity, 0);
-      const topPoi = cluster.pois.sort((a, b) => b.searches - a.searches)[0];
-
-      const poiListHtml = cluster.pois.length > 1
-        ? `<div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,0.6);">${cluster.pois.slice(0, 5).map(p => `${p.name || 'Area'} (${p.searches} srch)`).join('<br>')}${cluster.pois.length > 5 ? `<br>+${cluster.pois.length - 5} more` : ''}</div>`
-        : '';
+      let bk30 = 0, rev30 = 0, paidAll = 0, revAll = 0;
+      activeSp.forEach(sp => { const bk = bookingStatsMap.get(sp.id); if(bk){bk30+=bk.bookings30d;rev30+=bk.revenue30d;paidAll+=bk.paidBookings;revAll+=bk.totalRevenue;} });
 
       marker.bindPopup(`
         <div style="font-size:13px;min-width:220px;">
-          <div style="font-weight:700;margin-bottom:2px;">${cluster.pois.length > 1 ? topPoi.city + ' — ' + cluster.pois.length + ' POIs' : (topPoi.name || topPoi.city + ' Area')}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.6);">${topPoi.city}, ${topPoi.country}${cluster.pois.length === 1 ? ' &middot; ' + (topPoi.type || '—') : ''}</div>
-          ${poiListHtml}
+          <div style="font-weight:700;margin-bottom:2px;">${d.name || d.city + ' Area'}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.6);">${d.city}, ${d.country} &middot; ${d.type || '—'}</div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
-          <div>Total Searches: <b>${totalSearches.toLocaleString()}</b></div>
-          <div>Avg CVR: <b style="color:${color}">${(avgCvr * 100).toFixed(1)}%</b></div>
-          <div>Avg Opportunity: <b>${avgOpp}/100</b></div>
+          <div>Searches: <b>${d.searches.toLocaleString()}</b></div>
+          <div>CVR: <b style="color:${color}">${(d.conversion_rate * 100).toFixed(1)}%</b></div>
+          <div>Conversions: <b>${d.conversions.toLocaleString()}</b></div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
-          <div style="color:#38bdf8;">Active StashPoints: <b>${activeSp.length}</b></div>
-          <div style="color:#38bdf8;">Total capacity: <b>${totalCap} bags</b></div>
-          ${(() => { let bk30 = 0, rev30 = 0, paidAll = 0, revAll = 0; activeSp.forEach(sp => { const bk = bookingStatsMap.get(sp.id); if(bk){bk30+=bk.bookings30d;rev30+=bk.revenue30d;paidAll+=bk.paidBookings;revAll+=bk.totalRevenue;}}); const fg=v=>v>=1000?'£'+(v/1000).toFixed(1)+'k':'£'+Math.round(v); return paidAll > 0 ? `<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;"><div style="color:#34d399;">All-time: <b>${paidAll.toLocaleString()}</b> bkgs · <b>${fg(revAll)}</b></div><div style="color:#67e8f9;">Last 30d: <b>${bk30}</b> bkgs · <b>${fg(rev30)}</b></div>` : ''; })()}
-          ${totalCap === 0 && totalSearches > 0 ? '<div style="color:#f87171;font-weight:600;margin-top:4px;">&#9888; Supply gap!</div>' : ''}
+          <div style="color:#38bdf8;">StashPoints: <b>${activeSp.length}</b> &middot; Capacity: <b>${totalCap} bags</b></div>
+          ${paidAll > 0 ? `<div style="color:#34d399;">All-time: <b>${paidAll.toLocaleString()}</b> bkgs &middot; <b>${fmtG(revAll)}</b></div><div style="color:#67e8f9;">Last 30d: <b>${bk30}</b> bkgs &middot; <b>${fmtG(rev30)}</b></div>` : ''}
+          ${totalCap === 0 && d.searches > 0 ? '<div style="color:#f87171;font-weight:600;margin-top:4px;">&#9888; Supply gap!</div>' : ''}
         </div>
       `);
+
+      // 500m radius halo
+      const halo = L.circle([d.lat, d.lng], {
+        radius: 500,
+        fillColor: color,
+        fillOpacity: 0.04,
+        color: color,
+        weight: 0.5,
+        opacity: 0.3,
+      }).addTo(fullMap);
+      fullMapMarkers.push(halo);
+
+      // Area label (only for locations with 500+ searches to avoid clutter)
+      if (d.searches >= 500) {
+        const labelIcon = L.divIcon({
+          className: '',
+          html: `<div style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.7);white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8);pointer-events:none;">${d.name || ''}</div>`,
+          iconAnchor: [0, -radius - 4],
+        });
+        const label = L.marker([d.lat, d.lng], { icon: labelIcon, interactive: false }).addTo(fullMap);
+        fullMapMarkers.push(label);
+      }
 
       fullMapMarkers.push(marker);
     });
@@ -3310,12 +3338,16 @@ function renderMapTab() {
   if (showSpMarkers) {
     allStashpoints.forEach(sp => {
       const isActive = sp.active;
+      const isTempClosed = tempClosureSet.has(sp.id);
+      const spFill = isTempClosed ? '#94a3b8' : isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)';
+      const spBorder = isTempClosed ? 'rgba(148,163,184,0.4)' : isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
+      const spOpacity = isTempClosed ? 0.5 : isActive ? 0.7 : 0.3;
       const marker = L.circleMarker([sp.lat, sp.lng], {
         radius: 3,
-        fillColor: isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)',
-        color: isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)',
+        fillColor: spFill,
+        color: spBorder,
         weight: 1,
-        fillOpacity: isActive ? 0.7 : 0.3,
+        fillOpacity: spOpacity,
       }).addTo(fullMap);
 
       const avgRating = sp.reviews > 0 ? (sp.rating / sp.reviews).toFixed(1) : '—';
@@ -3329,7 +3361,7 @@ function renderMapTab() {
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
           <div>Capacity: <b>${sp.capacity} bags</b></div>
           <div>Rating: <b>${avgRating}</b> (${sp.reviews} reviews)</div>
-          <div>Status: <b style="color:${isActive ? '#34d399' : '#f87171'}">${isActive ? 'Active' : 'Inactive'}</b></div>
+          <div>Status: <b style="color:${isTempClosed ? '#94a3b8' : isActive ? '#34d399' : '#f87171'}">${isTempClosed ? 'Temp. Closed' : isActive ? 'Active' : 'Inactive'}</b></div>
           <div>Type: ${sp.type || '—'} · Quality: ${sp.quality}/5</div>
           ${sp.open24 ? '<div style="color:#34d399;">Open 24/7</div>' : sp.openLate ? '<div style="color:#fbbf24;">Open Late</div>' : ''}
           ${bk ? `<hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
@@ -3528,14 +3560,16 @@ function renderSupplyDetail(d) {
     html += '<div style="margin-top:8px;">';
     nearbySp.forEach(sp => {
       const avgRating = sp.reviews > 0 ? (sp.rating / sp.reviews).toFixed(1) : '—';
-      const statusColor = sp.active ? '#34d399' : '#f87171';
-      const statusLabel = sp.active ? 'Active' : 'Inactive';
+      const isTempClosed = tempClosureSet.has(sp.id);
+      const statusColor = isTempClosed ? '#94a3b8' : sp.active ? '#34d399' : '#f87171';
+      const statusLabel = isTempClosed ? 'Temp. Closed' : sp.active ? 'Active' : 'Inactive';
       const distLabel = sp.dist < 0.1 ? Math.round(sp.dist * 1000) + 'm' : sp.dist.toFixed(2) + 'km';
       const typeLabel = sp.type ? sp.type.replace(/_/g, ' ') : '—';
       const features = [];
       if (sp.open24) features.push({ label: '24/7', color: 'rgba(16,185,129,0.15)', text: '#34d399' });
       else if (sp.openLate) features.push({ label: 'Open Late', color: 'rgba(245,158,11,0.15)', text: '#fbbf24' });
       else features.push({ label: 'Standard', color: 'rgba(148,163,184,0.1)', text: 'var(--text-muted)' });
+      if (isTempClosed) features.push({ label: 'Temp. Closed', color: 'rgba(148,163,184,0.15)', text: '#94a3b8' });
       if (sp.featured) features.push({ label: 'Featured', color: 'rgba(99,102,241,0.15)', text: 'var(--accent-light)' });
       if (sp.holidayOpen === 'closed' || sp.holidayOpen === 'closed_plus') features.push({ label: 'Holiday Closed', color: 'rgba(239,68,68,0.15)', text: '#f87171' });
       else if (sp.holidayOpen === 'default_schedule' || sp.holidayOpen === 'open') features.push({ label: 'Holiday Open', color: 'rgba(16,185,129,0.15)', text: '#34d399' });
@@ -3574,6 +3608,22 @@ function renderSupplyDetail(d) {
           <div></div>
         </div>` : ''}
         ${features.length > 0 ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${features.map(f => `<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:${f.color};color:${f.text};">${f.label}</span>`).join('')}</div>` : ''}
+        ${(() => {
+          const oh = openingHoursMap.get(sp.id);
+          if (!oh) return '';
+          const uid = 'oh_' + sp.id.replace(/[^a-z0-9]/gi, '');
+          return `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+            <div onclick="document.getElementById('${uid}').style.display=document.getElementById('${uid}').style.display==='none'?'block':'none';this.querySelector('span').textContent=document.getElementById('${uid}').style.display==='none'?'▸':'▾'" style="cursor:pointer;font-size:11px;font-weight:600;color:var(--text-muted);display:flex;align-items:center;gap:4px;">
+              <span>▸</span> Opening Hours
+            </div>
+            <div id="${uid}" style="display:none;margin-top:4px;">
+              ${oh.map(d => `<div style="display:flex;justify-content:space-between;font-size:10px;padding:2px 0;${d.hours === 'Closed' ? 'color:var(--danger);' : 'color:var(--text-muted);'}">
+                <span style="font-weight:600;width:30px;">${d.day}</span>
+                <span>${d.hours}</span>
+              </div>`).join('')}
+            </div>
+          </div>`;
+        })()}
       </div>`;
     });
     html += '</div>';
