@@ -8,35 +8,35 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     :root {
-      --bg: #090d16;
-      --surface: #0f1420;
-      --surface-2: #161d2e;
-      --border: rgba(255,255,255,0.06);
-      --text: #f0f2f5;
-      --text-muted: #7a8599;
+      --bg: #0b0f19;
+      --surface: #111827;
+      --surface-2: #1a2236;
+      --border: rgba(255,255,255,0.07);
+      --text: #e8eaed;
+      --text-muted: #6b7280;
       --accent: #6366f1;
       --accent-light: #a5b4fc;
-      --danger: #f87171;
-      --warning: #fbbf24;
-      --success: #34d399;
-      --cyan: #22d3ee;
-      --radius: 12px;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --cyan: #06b6d4;
+      --radius: 10px;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       overflow: hidden;
       height: 100vh;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      letter-spacing: -0.01em;
+      font-size: 13px;
+      line-height: 1.5;
     }
 
     /* Top bar */
@@ -44,42 +44,35 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 24px;
-      background: rgba(15,20,32,0.8);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      padding: 0 20px;
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
-      height: 52px;
+      height: 48px;
       z-index: 100;
     }
     .topbar h1 {
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text-muted);
     }
-    .topbar h1 span { color: var(--accent-light); }
+    .topbar h1 span { color: var(--text); font-weight: 700; }
     .topbar-controls {
       display: flex;
       gap: 12px;
       align-items: center;
     }
     .topbar-controls select, .topbar-controls input {
-      background: rgba(255,255,255,0.04);
+      background: var(--surface-2);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 7px 14px;
-      border-radius: 8px;
+      padding: 6px 12px;
+      border-radius: 6px;
       font-size: 12px;
-      font-weight: 500;
       outline: none;
-      transition: all 0.2s;
-    }
-    .topbar-controls select:hover, .topbar-controls input:hover {
-      background: rgba(255,255,255,0.06);
     }
     .topbar-controls select:focus, .topbar-controls input:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
     }
 
     /* Layout */
@@ -99,40 +92,33 @@
     /* KPI strip */
     .kpi-strip {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 12px;
-      padding: 16px 24px;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      padding: 14px 20px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
     }
     .kpi-card {
-      background: rgba(255,255,255,0.02);
-      border-radius: var(--radius);
-      padding: 14px 18px;
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 12px 14px;
       border: 1px solid var(--border);
-      transition: background 0.2s;
-    }
-    .kpi-card:hover {
-      background: rgba(255,255,255,0.04);
     }
     .kpi-card .label, .kpi-card .kpi-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
+      font-size: 11px;
       color: var(--text-muted);
-      margin-bottom: 2px;
-      font-weight: 600;
+      margin-bottom: 4px;
     }
     .kpi-card .value, .kpi-card .kpi-value {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
     }
     .kpi-card .sub, .kpi-card .kpi-sub {
       font-size: 10px;
       color: var(--text-muted);
-      margin-top: 3px;
+      margin-top: 2px;
     }
 
     /* Scatter + Table area */
@@ -189,9 +175,8 @@
     .table-scroll {
       flex: 1;
       overflow-y: auto;
-      border-radius: var(--radius);
+      border-radius: 8px;
       border: 1px solid var(--border);
-      background: rgba(255,255,255,0.01);
     }
     .table-scroll::-webkit-scrollbar { width: 6px; }
     .table-scroll::-webkit-scrollbar-track { background: var(--surface); }
@@ -208,42 +193,39 @@
       z-index: 2;
     }
     thead th {
-      background: rgba(255,255,255,0.03);
-      padding: 10px 14px;
+      background: var(--surface-2);
+      padding: 9px 14px;
       text-align: left;
       font-weight: 600;
-      font-size: 10px;
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.04em;
       color: var(--text-muted);
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
     }
-    thead th:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    thead th:hover { color: var(--text); }
     thead th.sorted-asc::after { content: ' ↑'; color: var(--accent-light); }
     thead th.sorted-desc::after { content: ' ↓'; color: var(--accent-light); }
     tbody tr {
       border-bottom: 1px solid var(--border);
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background 0.1s;
     }
-    tbody tr:nth-child(even) { background: rgba(255,255,255,0.01); }
-    tbody tr:hover { background: rgba(99, 102, 241, 0.06); }
-    tbody tr.selected { background: rgba(99, 102, 241, 0.1); box-shadow: inset 3px 0 0 var(--accent); }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody tr.selected { background: rgba(99, 102, 241, 0.08); }
     tbody td {
       padding: 10px 14px;
       white-space: nowrap;
     }
 
-    /* Performing well row highlight */
     tbody tr.row-performing {
       border-left: 3px solid var(--success);
-      background: rgba(16,185,129,0.04);
     }
     tbody tr.row-performing:hover {
-      background: rgba(16,185,129,0.10);
+      background: rgba(16,185,129,0.05);
     }
 
     /* Opportunity bar */
@@ -307,8 +289,7 @@
 
     /* Right: minimap panel */
     .minimap-panel {
-      background: rgba(15,20,32,0.7);
-      backdrop-filter: blur(16px);
+      background: var(--surface);
       border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
@@ -369,10 +350,10 @@
       margin-bottom: 12px;
     }
     .detail-metric-card {
-      background: rgba(255,255,255,0.03);
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 14px;
+      border-radius: 8px;
+      padding: 10px 12px;
     }
     .detail-metric-card .dm-value {
       font-size: 20px;
@@ -643,33 +624,30 @@
     .tab-bar {
       display: flex;
       align-items: center;
-      gap: 2px;
+      gap: 0;
       padding: 0 20px;
-      background: rgba(15,20,32,0.6);
-      backdrop-filter: blur(12px);
+      background: var(--surface);
       border-bottom: 1px solid var(--border);
-      height: 42px;
+      height: 40px;
       flex-shrink: 0;
     }
     .tab-btn {
-      padding: 8px 16px;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 500;
       color: var(--text-muted);
       cursor: pointer;
       border: none;
       background: none;
       border-bottom: 2px solid transparent;
-      border-radius: 6px 6px 0 0;
-      transition: all 0.2s;
+      transition: color 0.15s;
       white-space: nowrap;
-      letter-spacing: -0.01em;
     }
-    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+    .tab-btn:hover { color: var(--text); }
     .tab-btn.active {
       color: var(--text);
-      border-bottom-color: var(--accent-light);
-      background: rgba(99,102,241,0.06);
+      font-weight: 600;
+      border-bottom-color: var(--accent);
     }
     .tab-content { display: none; }
     .tab-content.active { display: flex; flex-direction: column; }
@@ -688,20 +666,21 @@
     }
     .map-legend {
       position: absolute;
-      bottom: 24px;
-      left: 24px;
+      bottom: 20px;
+      left: 20px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 12px 16px;
       z-index: 500;
-      font-size: 12px;
+      font-size: 11px;
     }
     .map-legend-item {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
+      color: var(--text-muted);
     }
     .map-legend-dot {
       width: 10px;
@@ -741,7 +720,7 @@
       background: var(--surface-2);
       color: var(--text);
       border-radius: 8px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
     .leaflet-popup-tip { background: var(--surface-2); }
     .leaflet-popup-close-button { color: var(--text-muted) !important; }
@@ -796,7 +775,7 @@
     .map-toggle {
       background: var(--surface);
       border: 1px solid var(--border);
-      color: var(--text);
+      color: var(--text-muted);
       padding: 6px 12px;
       border-radius: 6px;
       font-size: 12px;
@@ -955,6 +934,8 @@
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);margin:8px 0 6px;">Supply (StashPoints)</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:#38bdf8;border:1px solid rgba(255,255,255,0.4);"></div> Active StashPoint</div>
         <div class="map-legend-item"><div class="map-legend-dot" style="background:rgba(56,189,248,0.3);border:1px dashed rgba(255,255,255,0.3);"></div> Inactive StashPoint</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#a78bfa;box-shadow:0 0 6px rgba(124,58,237,0.5);"></div> Top Earner</div>
+        <div class="map-legend-item"><div class="map-legend-dot" style="background:#94a3b8;"></div> Temp. Closed</div>
       </div>
     </div>
   </div>
@@ -3106,18 +3087,32 @@ function renderCityView(cityKey) {
   });
 
   // ─── StashPoint supply dots ───
+  const TOP_EARNER_THRESHOLD_CITY = 3700;
   citySpList.forEach(sp => {
     const isActive = sp.active;
+    const isTempClosed = tempClosureSet.has(sp.id);
+    const bkData = bookingStatsMap.get(sp.id);
+    const isTopEarner = bkData && bkData.revenue30d >= 2000;
+    const spFill = isTempClosed ? '#94a3b8' : isTopEarner ? '#a78bfa' : isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)';
+    const spBorderC = isTempClosed ? 'rgba(148,163,184,0.4)' : isTopEarner ? 'rgba(167,139,250,0.8)' : isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
+
+    if (isTopEarner && isActive) {
+      const glow = L.circleMarker([sp.lat, sp.lng], {
+        radius: 12, fillColor: '#7c3aed', fillOpacity: 0.12, color: '#a78bfa', weight: 1, opacity: 0.4, interactive: false,
+      }).addTo(cityMap);
+      cityMapMarkers.push(glow);
+    }
+
     const marker = L.circleMarker([sp.lat, sp.lng], {
-      radius: 4, fillColor: isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)',
-      color: isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', weight: 1,
-      fillOpacity: isActive ? 0.7 : 0.3,
+      radius: isTopEarner ? 6 : 5, fillColor: spFill,
+      color: spBorderC, weight: 1.5,
+      fillOpacity: isTempClosed ? 0.5 : 0.8,
     }).addTo(cityMap);
     const bk = bookingStatsMap.get(sp.id);
     marker.bindPopup(`
-      <div style="font-size:12px;"><b style="color:#38bdf8;">${sp.name}</b><br>${sp.locationName}
+      <div style="font-size:12px;"><b style="color:${isTopEarner ? '#a78bfa' : '#38bdf8'};">${sp.name}</b>${isTopEarner ? ' <span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(124,58,237,0.2);color:#a78bfa;">Top Earner</span>' : ''}<br>${sp.locationName}
       <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:4px 0;">
-      Capacity: <b>${sp.capacity}</b> · ${isActive ? '<span style="color:#34d399">Active</span>' : '<span style="color:#f87171">Inactive</span>'}
+      Capacity: <b>${sp.capacity}</b> · ${isTempClosed ? '<span style="color:#94a3b8">Temp. Closed</span>' : isActive ? '<span style="color:#34d399">Active</span>' : '<span style="color:#f87171">Inactive</span>'}
       ${bk ? `<br>30d: <b>${bk.bookings30d}</b> bkgs · <b style="color:#67e8f9;">${fmtG(bk.revenue30d)}</b>` : ''}
       </div>
     `);
@@ -3276,9 +3271,39 @@ function renderMapTab() {
   fullMapSpMarkers.forEach(m => fullMap.removeLayer(m));
   fullMapSpMarkers = [];
 
-  // POI demand markers — individual dots like city breakdown
+  // POI demand markers — individual dots with halos and labels
   if (showPoiMarkers) {
     const fmtG = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
+
+    // Pass 1: halos (bottom layer, non-interactive)
+    filteredData.forEach(d => {
+      const color = d.conversion_rate > 0.08 ? '#34d399' : d.conversion_rate >= 0.04 ? '#fbbf24' : '#f87171';
+      const halo = L.circle([d.lat, d.lng], {
+        radius: 500,
+        fillColor: color,
+        fillOpacity: 0.04,
+        color: color,
+        weight: 0.5,
+        opacity: 0.3,
+        interactive: false,
+      }).addTo(fullMap);
+      fullMapMarkers.push(halo);
+    });
+
+    // Pass 2: labels (non-interactive)
+    filteredData.forEach(d => {
+      if (d.searches < 500) return;
+      const radius = d.searches < 500 ? 5 : d.searches < 2000 ? 9 : d.searches < 5000 ? 14 : 20;
+      const labelIcon = L.divIcon({
+        className: '',
+        html: `<div style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.75);white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.9);pointer-events:none;">${d.name || ''}</div>`,
+        iconAnchor: [0, -radius - 6],
+      });
+      const label = L.marker([d.lat, d.lng], { icon: labelIcon, interactive: false }).addTo(fullMap);
+      fullMapMarkers.push(label);
+    });
+
+    // Pass 3: clickable dots (top layer)
     filteredData.forEach(d => {
       const color = d.conversion_rate > 0.08 ? '#34d399' : d.conversion_rate >= 0.04 ? '#fbbf24' : '#f87171';
       const radius = d.searches < 500 ? 5 : d.searches < 2000 ? 9 : d.searches < 5000 ? 14 : 20;
@@ -3294,59 +3319,52 @@ function renderMapTab() {
       activeSp.forEach(sp => { const bk = bookingStatsMap.get(sp.id); if(bk){bk30+=bk.bookings30d;rev30+=bk.revenue30d;paidAll+=bk.paidBookings;revAll+=bk.totalRevenue;} });
 
       marker.bindPopup(`
-        <div style="font-size:13px;min-width:220px;">
+        <div style="font-size:13px;min-width:240px;">
           <div style="font-weight:700;margin-bottom:2px;">${d.name || d.city + ' Area'}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.6);">${d.city}, ${d.country} &middot; ${d.type || '—'}</div>
-          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
-          <div>Searches: <b>${d.searches.toLocaleString()}</b></div>
-          <div>CVR: <b style="color:${color}">${(d.conversion_rate * 100).toFixed(1)}%</b></div>
-          <div>Conversions: <b>${d.conversions.toLocaleString()}</b></div>
-          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
-          <div style="color:#38bdf8;">StashPoints: <b>${activeSp.length}</b> &middot; Capacity: <b>${totalCap} bags</b></div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);">${d.city}, ${d.country} &middot; ${d.type || '—'}</div>
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:8px 0;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">
+            <div>Searches <b style="float:right;">${d.searches.toLocaleString()}</b></div>
+            <div>CVR <b style="float:right;color:${color}">${(d.conversion_rate * 100).toFixed(1)}%</b></div>
+            <div>Conversions <b style="float:right;">${d.conversions.toLocaleString()}</b></div>
+            <div>Stashpoints <b style="float:right;color:#22d3ee;">${activeSp.length}</b></div>
+          </div>
+          ${totalCap > 0 ? `<hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:8px 0;"><div style="color:#22d3ee;">Capacity: <b>${totalCap} bags</b></div>` : ''}
           ${paidAll > 0 ? `<div style="color:#34d399;">All-time: <b>${paidAll.toLocaleString()}</b> bkgs &middot; <b>${fmtG(revAll)}</b></div><div style="color:#67e8f9;">Last 30d: <b>${bk30}</b> bkgs &middot; <b>${fmtG(rev30)}</b></div>` : ''}
-          ${totalCap === 0 && d.searches > 0 ? '<div style="color:#f87171;font-weight:600;margin-top:4px;">&#9888; Supply gap!</div>' : ''}
+          ${totalCap === 0 && d.searches > 0 ? '<div style="color:#f87171;font-weight:600;margin-top:6px;">&#9888; Supply gap!</div>' : ''}
         </div>
       `);
-
-      // 500m radius halo
-      const halo = L.circle([d.lat, d.lng], {
-        radius: 500,
-        fillColor: color,
-        fillOpacity: 0.04,
-        color: color,
-        weight: 0.5,
-        opacity: 0.3,
-      }).addTo(fullMap);
-      fullMapMarkers.push(halo);
-
-      // Area label (only for locations with 500+ searches to avoid clutter)
-      if (d.searches >= 500) {
-        const labelIcon = L.divIcon({
-          className: '',
-          html: `<div style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.7);white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8);pointer-events:none;">${d.name || ''}</div>`,
-          iconAnchor: [0, -radius - 4],
-        });
-        const label = L.marker([d.lat, d.lng], { icon: labelIcon, interactive: false }).addTo(fullMap);
-        fullMapMarkers.push(label);
-      }
 
       fullMapMarkers.push(marker);
     });
   }
 
   // StashPoint supply markers
+  const TOP_EARNER_THRESHOLD = 3700; // GBP — top ~10% of earners
   if (showSpMarkers) {
     allStashpoints.forEach(sp => {
       const isActive = sp.active;
       const isTempClosed = tempClosureSet.has(sp.id);
-      const spFill = isTempClosed ? '#94a3b8' : isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)';
-      const spBorder = isTempClosed ? 'rgba(148,163,184,0.4)' : isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
-      const spOpacity = isTempClosed ? 0.5 : isActive ? 0.7 : 0.3;
+      const bkData = bookingStatsMap.get(sp.id);
+      const isTopEarner = bkData && bkData.revenue30d >= 2000;
+      const spFill = isTempClosed ? '#94a3b8' : isTopEarner ? '#a78bfa' : isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)';
+      const spBorder = isTempClosed ? 'rgba(148,163,184,0.4)' : isTopEarner ? 'rgba(167,139,250,0.8)' : isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)';
+      const spOpacity = isTempClosed ? 0.5 : isActive ? 0.8 : 0.3;
+      const spRadius = isTopEarner ? 7 : 5;
+
+      // Purple glow halo for top earners
+      if (isTopEarner && isActive) {
+        const glow = L.circleMarker([sp.lat, sp.lng], {
+          radius: 14, fillColor: '#7c3aed', fillOpacity: 0.12, color: '#a78bfa', weight: 1, opacity: 0.4, interactive: false,
+        }).addTo(fullMap);
+        fullMapSpMarkers.push(glow);
+      }
+
       const marker = L.circleMarker([sp.lat, sp.lng], {
-        radius: 3,
+        radius: spRadius,
         fillColor: spFill,
         color: spBorder,
-        weight: 1,
+        weight: 1.5,
         fillOpacity: spOpacity,
       }).addTo(fullMap);
 
@@ -3355,7 +3373,7 @@ function renderMapTab() {
       const fmtGbp = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
       marker.bindPopup(`
         <div style="font-size:13px;min-width:220px;">
-          <div style="font-weight:700;margin-bottom:2px;color:#38bdf8;">${sp.name}</div>
+          <div style="font-weight:700;margin-bottom:2px;color:${isTopEarner ? '#a78bfa' : '#38bdf8'};">${sp.name}${isTopEarner ? ' <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(124,58,237,0.2);color:#a78bfa;font-weight:600;">Top Earner</span>' : ''}</div>
           <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">${sp.locationName}</div>
           <div>${sp.address}</div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
