@@ -97,22 +97,24 @@
       padding: 12px 16px;
       border: 1px solid var(--border);
     }
-    .kpi-card .label {
-      font-size: 11px;
+    .kpi-card .label, .kpi-card .kpi-label {
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       color: var(--text-muted);
-      margin-bottom: 4px;
+      margin-bottom: 2px;
+      font-weight: 600;
     }
-    .kpi-card .value {
-      font-size: 22px;
+    .kpi-card .value, .kpi-card .kpi-value {
+      font-size: 24px;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
     }
-    .kpi-card .sub {
-      font-size: 11px;
+    .kpi-card .sub, .kpi-card .kpi-sub {
+      font-size: 10px;
       color: var(--text-muted);
-      margin-top: 2px;
+      margin-top: 3px;
     }
 
     /* Scatter + Table area */
@@ -204,10 +206,11 @@
     thead th.sorted-asc::after { content: ' ↑'; color: var(--accent-light); }
     thead th.sorted-desc::after { content: ' ↓'; color: var(--accent-light); }
     tbody tr {
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(30,41,59,0.5);
       cursor: pointer;
       transition: background 0.15s;
     }
+    tbody tr:nth-child(even) { background: rgba(17,24,39,0.4); }
     tbody tr:hover { background: rgba(99, 102, 241, 0.08); }
     tbody tr.selected { background: rgba(99, 102, 241, 0.15); }
     tbody td {
@@ -309,7 +312,7 @@
       letter-spacing: -0.02em;
     }
     #minimap {
-      height: 250px;
+      height: 200px;
       flex-shrink: 0;
     }
     .detail-scroll-area {
@@ -328,7 +331,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 0;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(30,41,59,0.5);
     }
     .detail-stat-row .stat-label {
       font-size: 12px;
@@ -337,6 +340,40 @@
     .detail-stat-row .stat-value {
       font-size: 14px;
       font-weight: 600;
+    }
+    .detail-metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .detail-metric-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .detail-metric-card .dm-value {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .detail-metric-card .dm-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .detail-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin: 14px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
     }
 
     /* Nearby locations list */
@@ -611,6 +648,7 @@
     }
     .tab-content { display: none; }
     .tab-content.active { display: flex; flex-direction: column; }
+    #tab-citybreakdown.active { overflow: hidden; }
 
     /* Full map tab */
     #tab-map {
@@ -793,6 +831,7 @@
 
 <div class="tab-bar">
   <button class="tab-btn active" data-tab="map">Map</button>
+  <button class="tab-btn" data-tab="citybreakdown">City Breakdown</button>
   <button class="tab-btn" data-tab="opportunity">Opportunity</button>
   <button class="tab-btn" data-tab="performing">Performing Well</button>
   <button class="tab-btn" data-tab="underperforming">Underperforming</button>
@@ -800,6 +839,30 @@
 
 <div class="layout map-active">
   <div class="main-panel">
+    <!-- TAB: City Breakdown -->
+    <div class="tab-content" id="tab-citybreakdown">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">City</label>
+        <select id="cityBreakdownSelect" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:6px;font-size:13px;outline:none;min-width:220px;font-weight:600;"></select>
+        <span id="cityBreakdownSummary" style="font-size:12px;color:var(--text-muted);margin-left:8px;"></span>
+      </div>
+      <div class="kpi-strip" id="cityKpiStrip" style="flex-shrink:0;padding:10px 24px;gap:8px;"></div>
+      <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;min-height:0;">
+        <div id="cityMap" style="width:100%;height:100%;border-right:1px solid var(--border);"></div>
+        <div style="display:flex;flex-direction:column;overflow:hidden;">
+          <div style="padding:10px 16px 6px;flex-shrink:0;">
+            <h2 style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Locations in City</h2>
+          </div>
+          <div class="table-scroll" id="cityTableScroll" style="flex:1;overflow:auto;">
+            <table>
+              <thead id="cityTableHead" style="position:sticky;top:0;z-index:2;"></thead>
+              <tbody id="cityTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- TAB: Opportunity -->
     <div class="tab-content" id="tab-opportunity">
       <div class="kpi-strip" id="kpiStrip"></div>
@@ -1097,6 +1160,7 @@ function applyFilters() {
   else if (activeTab === 'underperforming') renderUnderperformingTab();
   else if (activeTab === 'seo') renderSeoTab();
   else if (activeTab === 'map') renderMapTab();
+  else if (activeTab === 'citybreakdown') renderCityBreakdownTab();
 }
 
 function sortData() {
@@ -1476,46 +1540,46 @@ function selectLocation(d) {
     minimapMarkers.push(m);
   });
 
-  // Detail stats
+  // Detail stats — card layout for key metrics
   const convColor = d.conversion_rate < 0.07 ? 'var(--danger)' : d.conversion_rate < 0.12 ? 'var(--warning)' : 'var(--success)';
+  const spColor = d.stashpoints === 0 ? 'var(--danger)' : d.stashpoints < 5 ? 'var(--warning)' : 'var(--success)';
+  const oppColor = d.opportunity_score >= 70 ? 'var(--danger)' : d.opportunity_score >= 50 ? 'var(--warning)' : 'var(--success)';
+
   document.getElementById('detailStats').innerHTML = `
-    <div class="detail-stat-row">
-      <span class="stat-label">CVR Tier</span>
-      <span class="stat-value"><span class="tier-badge ${d.cvr_tier.cls}">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span></span>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+      <span class="tier-badge ${d.cvr_tier.cls}" style="font-size:12px;padding:4px 10px;">${d.cvr_tier.icon ? d.cvr_tier.icon + ' ' : ''}${d.cvr_tier.label}</span>
+      <span style="font-size:12px;color:var(--text-muted);background:var(--surface-2);padding:4px 10px;border-radius:6px;border:1px solid var(--border);">${d.type || '—'}</span>
+      <span style="font-size:12px;color:var(--text-muted);background:var(--surface-2);padding:4px 10px;border-radius:6px;border:1px solid var(--border);">${d.city}, ${d.country}</span>
     </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">Type</span>
-      <span class="stat-value">${d.type || '—'}</span>
+
+    <div class="detail-metric-grid">
+      <div class="detail-metric-card">
+        <div class="dm-value" style="color:var(--cyan);">${d.searches.toLocaleString()}</div>
+        <div class="dm-label">Searches (500m)</div>
+      </div>
+      <div class="detail-metric-card">
+        <div class="dm-value" style="color:${convColor};">${(d.conversion_rate * 100).toFixed(1)}%</div>
+        <div class="dm-label">Conversion Rate</div>
+      </div>
+      <div class="detail-metric-card">
+        <div class="dm-value">${d.conversions.toLocaleString()}</div>
+        <div class="dm-label">Conversions</div>
+      </div>
+      <div class="detail-metric-card">
+        <div class="dm-value" style="color:${spColor};">${d.stashpoints}</div>
+        <div class="dm-label">Stashpoints Nearby</div>
+      </div>
     </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">City / Country</span>
-      <span class="stat-value">${d.city}, ${d.country}</span>
-    </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">Searches (500m)</span>
-      <span class="stat-value">${d.searches.toLocaleString()}</span>
-    </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">Conversions</span>
-      <span class="stat-value">${d.conversions.toLocaleString()}</span>
-    </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">Conversion Rate</span>
-      <span class="stat-value" style="color:${convColor}">${(d.conversion_rate * 100).toFixed(1)}%</span>
-    </div>
-    <div class="detail-stat-row">
-      <span class="stat-label">Stashpoints Nearby</span>
-      <span class="stat-value" style="color:${d.stashpoints === 0 ? 'var(--danger)' : d.stashpoints < 5 ? 'var(--warning)' : 'var(--success)'}">${d.stashpoints}</span>
-    </div>
+
     <div class="detail-stat-row">
       <span class="stat-label">Opportunity Score</span>
-      <span class="stat-value" style="color:var(--accent-light);font-size:18px">${d.opportunity_score}/100</span>
+      <span class="stat-value"><span style="display:inline-block;width:50px;height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;vertical-align:middle;margin-right:6px;"><span style="display:block;height:100%;width:${d.opportunity_score}%;background:${oppColor};border-radius:3px;"></span></span><span style="color:${oppColor};">${d.opportunity_score}/100</span></span>
     </div>
     <div class="detail-stat-row">
       <span class="stat-label">Missed Conversions</span>
-      <span class="stat-value" style="color:var(--danger)">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() : '—'}</span>
+      <span class="stat-value" style="color:var(--danger)">${d.missed_conversions > 0 ? '+' + d.missed_conversions.toLocaleString() + ' /mo' : '—'}</span>
     </div>
-    ${d.details ? `<div class="detail-stat-row"><span class="stat-label">About</span><span class="stat-value" style="white-space:normal;font-size:12px;font-weight:400;color:var(--text-muted);max-width:240px">${d.details}</span></div>` : ''}
+    ${d.details ? `<div style="margin-top:10px;padding:10px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);font-size:11px;color:var(--text-muted);line-height:1.5;">${d.details}</div>` : ''}
   `;
 
   // Resize map after render
@@ -2485,6 +2549,8 @@ function switchTab(tabName) {
     renderPerformingTab();
   } else if (tabName === 'underperforming') {
     renderUnderperformingTab();
+  } else if (tabName === 'citybreakdown') {
+    setTimeout(() => { renderCityBreakdownTab(); if (cityMap) cityMap.invalidateSize(); }, 50);
   } else if (tabName === 'map') {
     setTimeout(() => renderMapTab(), 50);
   }
@@ -2585,6 +2651,11 @@ function renderPerformingTab() {
       selectLocation(perfData[idx]);
     });
   });
+
+  // Auto-select first row if nothing selected
+  if (perfData.length > 0 && (!selectedRow || !perfData.find(d => d.lat === selectedRow.lat && d.lng === selectedRow.lng))) {
+    selectLocation(perfData[0]);
+  }
 }
 
 // ─── Underperforming Tab ───
@@ -2676,6 +2747,11 @@ function renderUnderperformingTab() {
       selectLocation(underData[idx]);
     });
   });
+
+  // Auto-select first row if nothing selected
+  if (underData.length > 0 && (!selectedRow || !underData.find(d => d.lat === selectedRow.lat && d.lng === selectedRow.lng))) {
+    selectLocation(underData[0]);
+  }
 }
 
 // ─── SEO Tab ───
@@ -2813,6 +2889,309 @@ function renderSeoTab() {
 }
 
 // SEO Fetch All button
+// ─── City Breakdown Tab ───
+let cityMap = null;
+let cityMapMarkers = [];
+let cityMapAreaZones = [];
+let citySortCol = 'searches';
+let citySortDir = 'desc';
+let selectedCityName = '';
+
+function getCityAggregates() {
+  const cityMap = new Map();
+  filteredData.forEach(d => {
+    if (!d.city) return;
+    const key = d.city + '|' + d.country;
+    if (!cityMap.has(key)) {
+      cityMap.set(key, { city: d.city, country: d.country, locations: [], totalSearches: 0, totalConversions: 0, totalStashpoints: 0 });
+    }
+    const c = cityMap.get(key);
+    c.locations.push(d);
+    c.totalSearches += d.searches || 0;
+    c.totalConversions += d.conversions || 0;
+    c.totalStashpoints += d.stashpoints || 0;
+  });
+  return [...cityMap.values()].sort((a, b) => b.totalSearches - a.totalSearches);
+}
+
+function renderCityBreakdownTab() {
+  const cities = getCityAggregates();
+  const sel = document.getElementById('cityBreakdownSelect');
+  if (!sel) return;
+
+  // Populate city dropdown
+  const currentVal = selectedCityName || (cities.length > 0 ? cities[0].city + '|' + cities[0].country : '');
+  sel.innerHTML = cities.map(c => {
+    const val = c.city + '|' + c.country;
+    return `<option value="${val}" ${val === currentVal ? 'selected' : ''}>${c.city}, ${c.country} (${c.totalSearches.toLocaleString()} searches)</option>`;
+  }).join('');
+  selectedCityName = sel.value || currentVal;
+
+  renderCityView(selectedCityName);
+}
+
+function renderCityView(cityKey) {
+  if (!cityKey) return;
+  const [cityName, countryName] = cityKey.split('|');
+  const cityLocations = filteredData.filter(d => d.city === cityName && d.country === countryName);
+  if (cityLocations.length === 0) return;
+
+  // Summary text
+  const summaryEl = document.getElementById('cityBreakdownSummary');
+  if (summaryEl) summaryEl.textContent = `${cityLocations.length} locations tracked`;
+
+  // ─── City KPIs ───
+  const totalSearches = cityLocations.reduce((s, d) => s + d.searches, 0);
+  const totalConversions = cityLocations.reduce((s, d) => s + d.conversions, 0);
+  const avgCvr = totalSearches > 0 ? (totalConversions / totalSearches * 100).toFixed(1) : 0;
+  const missedConv = cityLocations.reduce((s, d) => s + d.missed_conversions, 0);
+
+  // Find all stashpoints in city (nearby any POI)
+  const citySpIds = new Set();
+  const citySpList = [];
+  cityLocations.forEach(d => {
+    const nearby = findNearbyStashpoints(d.lat, d.lng, 0.5);
+    nearby.forEach(sp => { if (!citySpIds.has(sp.id)) { citySpIds.add(sp.id); citySpList.push(sp); } });
+  });
+  const activeSp = citySpList.filter(sp => sp.active);
+  const totalCap = activeSp.reduce((s, sp) => s + sp.capacity, 0);
+
+  // Aggregate booking stats for city
+  let cityRev30d = 0, cityBk30d = 0, cityRevTotal = 0;
+  activeSp.forEach(sp => {
+    const bk = bookingStatsMap.get(sp.id);
+    if (bk) { cityRev30d += bk.revenue30d; cityBk30d += bk.bookings30d; cityRevTotal += bk.totalRevenue; }
+  });
+  const fmtG = v => v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + Math.round(v);
+  const cvrColor = parseFloat(avgCvr) >= 8 ? 'var(--success)' : parseFloat(avgCvr) >= 4 ? 'var(--warning)' : 'var(--danger)';
+
+  const kpiStrip = document.getElementById('cityKpiStrip');
+  if (kpiStrip) {
+    kpiStrip.innerHTML = `
+      <div class="kpi-card"><div class="kpi-value">${cityLocations.length}</div><div class="kpi-label">Locations</div><div class="kpi-sub">POIs tracked</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--cyan);">${totalSearches.toLocaleString()}</div><div class="kpi-label">Total Searches</div><div class="kpi-sub">500m demand</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:${cvrColor};">${avgCvr}%</div><div class="kpi-label">Avg CVR</div><div class="kpi-sub">${totalConversions.toLocaleString()} conversions</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--cyan);">${activeSp.length}</div><div class="kpi-label">StashPoints</div><div class="kpi-sub">${totalCap} bag capacity</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--success);">${fmtG(cityRev30d)}</div><div class="kpi-label">Revenue (30d)</div><div class="kpi-sub">${cityBk30d} bookings</div></div>
+      <div class="kpi-card"><div class="kpi-value" style="color:var(--danger);">${Math.round(missedConv).toLocaleString()}</div><div class="kpi-label">Missed Conv.</div><div class="kpi-sub">vs 15% benchmark</div></div>
+    `;
+  }
+
+  // ─── City Map ───
+  const mapEl = document.getElementById('cityMap');
+  if (!cityMap) {
+    cityMap = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView([cityLocations[0].lat, cityLocations[0].lng], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(cityMap);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', { maxZoom: 19, pane: 'overlayPane' }).addTo(cityMap);
+  }
+
+  // Clear old markers and zones
+  cityMapMarkers.forEach(m => cityMap.removeLayer(m));
+  cityMapMarkers = [];
+  cityMapAreaZones.forEach(z => cityMap.removeLayer(z));
+  cityMapAreaZones = [];
+
+  // ─── Area/Neighborhood Zones ───
+  // Group locations by proximity to create area clusters, then draw zone polygons
+  const areaClusters = [];
+  const usedIdx = new Set();
+  const sortedLocs = [...cityLocations].sort((a, b) => b.searches - a.searches);
+
+  sortedLocs.forEach((d, i) => {
+    if (usedIdx.has(i)) return;
+    usedIdx.add(i);
+    const cluster = { locs: [d], lat: d.lat, lng: d.lng, name: d.name || 'Area' };
+    sortedLocs.forEach((other, j) => {
+      if (i === j || usedIdx.has(j)) return;
+      if (haversine(d.lat, d.lng, other.lat, other.lng) <= 0.8) { // 800m radius for area grouping
+        cluster.locs.push(other);
+        usedIdx.add(j);
+      }
+    });
+    // Weighted centroid
+    const totalS = cluster.locs.reduce((s, l) => s + l.searches, 0);
+    if (totalS > 0) {
+      cluster.lat = cluster.locs.reduce((s, l) => s + l.lat * l.searches, 0) / totalS;
+      cluster.lng = cluster.locs.reduce((s, l) => s + l.lng * l.searches, 0) / totalS;
+    }
+    cluster.totalSearches = totalS;
+    cluster.avgCvr = totalS > 0 ? cluster.locs.reduce((s, l) => s + l.conversions, 0) / totalS : 0;
+    cluster.name = cluster.locs.length > 1 ? cluster.locs[0].name + ' area' : cluster.locs[0].name;
+    areaClusters.push(cluster);
+  });
+
+  // Draw area zone circles with labels
+  const zoneColors = ['#6366f1', '#06b6d4', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316', '#64748b'];
+  areaClusters.forEach((area, idx) => {
+    const zoneColor = zoneColors[idx % zoneColors.length];
+    const avgCvrPct = (area.avgCvr * 100).toFixed(1);
+    const zoneRadius = Math.max(200, Math.min(500, area.locs.length * 120));
+
+    // Area circle
+    const circle = L.circle([area.lat, area.lng], {
+      radius: zoneRadius,
+      fillColor: zoneColor,
+      fillOpacity: 0.08,
+      color: zoneColor,
+      weight: 1.5,
+      dashArray: '6 4',
+    }).addTo(cityMap);
+
+    // Area label
+    const labelIcon = L.divIcon({
+      className: '',
+      html: `<div style="background:${zoneColor}22;border:1px solid ${zoneColor}66;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;color:${zoneColor};white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,0.5);pointer-events:none;">${area.name}</div>`,
+      iconAnchor: [0, -zoneRadius * 0.3],
+    });
+    const label = L.marker([area.lat, area.lng], { icon: labelIcon, interactive: false }).addTo(cityMap);
+
+    circle.bindPopup(`
+      <div style="font-size:13px;min-width:180px;">
+        <div style="font-weight:700;color:${zoneColor};margin-bottom:4px;">${area.name}</div>
+        <div>${area.locs.length} location${area.locs.length > 1 ? 's' : ''}</div>
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:6px 0;">
+        <div>Searches: <b>${area.totalSearches.toLocaleString()}</b></div>
+        <div>Avg CVR: <b style="color:${area.avgCvr > 0.08 ? '#34d399' : area.avgCvr >= 0.04 ? '#fbbf24' : '#f87171'}">${avgCvrPct}%</b></div>
+        <div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,0.6);">${area.locs.map(l => l.name).join(', ')}</div>
+      </div>
+    `);
+
+    cityMapAreaZones.push(circle, label);
+  });
+
+  // ─── POI demand dots ───
+  const maxSearches = Math.max(...cityLocations.map(d => d.searches), 1);
+  cityLocations.forEach(d => {
+    const color = d.conversion_rate > 0.08 ? '#34d399' : d.conversion_rate >= 0.04 ? '#fbbf24' : '#f87171';
+    const radius = d.searches < 500 ? 5 : d.searches < 2000 ? 9 : d.searches < 5000 ? 14 : 20;
+    const marker = L.circleMarker([d.lat, d.lng], {
+      radius, fillColor: color, color: 'rgba(255,255,255,0.6)', weight: 1.5, fillOpacity: 0.85,
+    }).addTo(cityMap);
+    marker.bindPopup(`
+      <div style="font-size:13px;">
+        <div style="font-weight:700;">${d.name}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);">${d.type || '—'}</div>
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:4px 0;">
+        <div>Searches: <b>${d.searches.toLocaleString()}</b></div>
+        <div>CVR: <b style="color:${color}">${(d.conversion_rate * 100).toFixed(1)}%</b></div>
+        <div>Stashpoints: <b>${d.stashpoints}</b></div>
+      </div>
+    `);
+    cityMapMarkers.push(marker);
+  });
+
+  // ─── StashPoint supply dots ───
+  citySpList.forEach(sp => {
+    const isActive = sp.active;
+    const marker = L.circleMarker([sp.lat, sp.lng], {
+      radius: 4, fillColor: isActive ? '#38bdf8' : 'rgba(56,189,248,0.3)',
+      color: isActive ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)', weight: 1,
+      fillOpacity: isActive ? 0.7 : 0.3,
+    }).addTo(cityMap);
+    const bk = bookingStatsMap.get(sp.id);
+    marker.bindPopup(`
+      <div style="font-size:12px;"><b style="color:#38bdf8;">${sp.name}</b><br>${sp.locationName}
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:4px 0;">
+      Capacity: <b>${sp.capacity}</b> · ${isActive ? '<span style="color:#34d399">Active</span>' : '<span style="color:#f87171">Inactive</span>'}
+      ${bk ? `<br>30d: <b>${bk.bookings30d}</b> bkgs · <b style="color:#67e8f9;">${fmtG(bk.revenue30d)}</b>` : ''}
+      </div>
+    `);
+    cityMapMarkers.push(marker);
+  });
+
+  // Fit bounds
+  if (cityLocations.length > 0) {
+    const allPoints = [...cityLocations.map(d => [d.lat, d.lng]), ...citySpList.map(sp => [sp.lat, sp.lng])];
+    cityMap.fitBounds(L.latLngBounds(allPoints), { padding: [30, 30], maxZoom: 15 });
+  }
+
+  setTimeout(() => cityMap.invalidateSize(), 100);
+
+  // ─── Area Table ───
+  let tableData = cityLocations.map(d => {
+    // Get nearby SP booking data
+    const nearby = findNearbyStashpoints(d.lat, d.lng, 0.5).filter(sp => sp.active);
+    let bk30d = 0, rev30d = 0;
+    nearby.forEach(sp => { const bk = bookingStatsMap.get(sp.id); if (bk) { bk30d += bk.bookings30d; rev30d += bk.revenue30d; } });
+    return { ...d, bk30d, rev30d, spCount: nearby.length };
+  });
+
+  // Sort
+  tableData.sort((a, b) => {
+    let va = a[citySortCol], vb = b[citySortCol];
+    if (typeof va === 'string') va = (va || '').toLowerCase();
+    if (typeof vb === 'string') vb = (vb || '').toLowerCase();
+    if (va == null) va = 0; if (vb == null) vb = 0;
+    if (va < vb) return citySortDir === 'asc' ? -1 : 1;
+    if (va > vb) return citySortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const cols = [
+    { key: 'name', label: 'Location' },
+    { key: 'type', label: 'Type', width: '100px' },
+    { key: 'searches', label: 'Searches', width: '85px' },
+    { key: 'conversion_rate', label: 'CVR', width: '80px' },
+    { key: 'spCount', label: 'SPs', width: '60px' },
+    { key: 'bk30d', label: 'Bkgs 30d', width: '80px' },
+    { key: 'rev30d', label: 'Rev 30d', width: '85px' },
+    { key: 'missed_conversions', label: 'Missed', width: '75px' },
+  ];
+
+  const thead = document.getElementById('cityTableHead');
+  if (thead) {
+    thead.innerHTML = '<tr>' + cols.map(c => {
+      const arrow = citySortCol === c.key ? (citySortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      return `<th class="sortable" data-col="${c.key}" style="cursor:pointer;${c.width ? 'width:' + c.width : ''}">${c.label}${arrow}</th>`;
+    }).join('') + '</tr>';
+    thead.querySelectorAll('.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (citySortCol === col) citySortDir = citySortDir === 'asc' ? 'desc' : 'asc';
+        else { citySortCol = col; citySortDir = col === 'name' || col === 'type' ? 'asc' : 'desc'; }
+        renderCityView(selectedCityName);
+      });
+    });
+  }
+
+  const tbody = document.getElementById('cityTableBody');
+  if (tbody) {
+    tbody.innerHTML = tableData.map((d, idx) => {
+      const cvrPct = (d.conversion_rate * 100).toFixed(1);
+      const cvrColor = d.conversion_rate > 0.08 ? 'var(--success)' : d.conversion_rate >= 0.04 ? 'var(--warning)' : 'var(--danger)';
+      const spBadge = d.spCount === 0 ? 'badge-danger' : d.spCount < 5 ? 'badge-warning' : 'badge-success';
+      return `<tr data-idx="${idx}" style="cursor:pointer;">
+        <td style="font-weight:600;">${d.name}</td>
+        <td style="color:var(--text-muted);">${d.type || '—'}</td>
+        <td>${d.searches.toLocaleString()}</td>
+        <td><span style="color:${cvrColor};font-weight:700;">${cvrPct}%</span></td>
+        <td><span class="badge ${spBadge}">${d.spCount}</span></td>
+        <td>${d.bk30d > 0 ? d.bk30d : '<span style="color:var(--text-muted);">—</span>'}</td>
+        <td>${d.rev30d > 0 ? '<span style="color:var(--success);">' + fmtG(d.rev30d) + '</span>' : '<span style="color:var(--text-muted);">—</span>'}</td>
+        <td style="color:var(--danger);">${Math.round(d.missed_conversions) > 0 ? Math.round(d.missed_conversions) : '—'}</td>
+      </tr>`;
+    }).join('');
+    // Click row → select location
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const idx = parseInt(tr.dataset.idx);
+        if (tableData[idx]) selectLocation(tableData[idx]);
+      });
+    });
+
+    // Auto-select first row
+    if (tableData.length > 0 && (!selectedRow || !tableData.find(d => d.lat === selectedRow.lat && d.lng === selectedRow.lng))) {
+      selectLocation(tableData[0]);
+    }
+  }
+}
+
+// ─── City Breakdown: Event Listener ───
+document.getElementById('cityBreakdownSelect').addEventListener('change', function() {
+  selectedCityName = this.value;
+  renderCityView(selectedCityName);
+});
+
 // ─── Map Tab ───
 // Cluster POIs within a given radius (km) using greedy clustering
 function clusterPois(data, radiusKm) {
